@@ -49,6 +49,10 @@
 - Их форк = v2.7.6-beta.5 + MCP/RDR/Watchdog/Per-task provider (444 коммита)
 - Код совместим: те же пути, тот же Python backend, тот же Electron frontend
 
+## UI улучшения
+
+- [ ] **Группировка логов по subtask'ам** — сейчас 900+ записей в Coding фазе идут плоской лентой. Backend уже пишет `subtask_id` в каждую лог-запись (`TaskLogEntry.subtask_id`), но UI (`TaskLogs.tsx`) это поле игнорирует. Нужно: сгруппировать entries по subtask_id через `useMemo`, добавить collapsible `SubtaskLogGroup` между phase и entries, подтянуть название из `task.subtasks`. Только фронтенд, backend не трогать.
+
 ## Другие идеи
 
 - [ ] Посмотреть kanban reconciliation fix из **Sallvainian/BMAD-Studio** — auto-heal stuck задач
