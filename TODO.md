@@ -6,34 +6,48 @@
 
 ### Приоритет 1 — быстро, большая отдача
 
-- [ ] **exitReason tracking** — `_save_exit_reason()` в `coder.py` и `planner.py` (~80 строк). Пишет причину падения в `implementation_plan.json`. Без этого непонятно почему задача сдохла.
+- [ ] **exitReason tracking** — `_save_exit_reason()` в `coder.py` и `planner.py` (~80 строк). Пишет причину падения в `implementation_plan.json`. У нас есть `stuck_subtasks` recovery в `prompts_pkg/prompts.py` но нет structured exit reason. Это дополняет.
 
-- [ ] **Per-task provider selection** — каждая задача может юзать свой API профиль. Читает `providerId` из `task_metadata.json`, передаёт env агенту. 17 файлов но изолированная фича, не ломает остальное.
+- [ ] **Per-task provider selection** — каждая задача может юзать свой API профиль. У нас уже есть `providerId` в `integrations/types.ts` но не используется для выбора провайдера при старте агента. У них полная цепочка: metadata → env override → agent.
 
-- [ ] **Project Index Cache** — 5-мин TTL кэш с threading.Lock в `core/client.py` (+49 строк). Ускоряет создание агентских сессий, 0 side effects.
+### Уже есть у нас
+
+- [x] **Project Index Cache** — `core/client.py`, `_get_cached_project_data()` с TTL 5 мин + threading.Lock
+- [x] **Stuck subtask recovery** — `prompts_pkg/prompts.py:306` — recovery context для stuck subtasks с attempt count
+- [x] **File watcher** — `file-watcher.ts` + chokidar уже подключён (11 файлов юзают), мониторит plan-файлы
+- [x] **MCP базовый** — `auto_claude_tools.py` + `create_auto_claude_mcp_server()` — уже есть MCP-сервер для тулзов агентов
+- [x] **Overnight token refresh** — `token-refresh.ts` + `usage-monitor.ts` — автообновление токенов для ночных билдов
+- [x] **Queue routing** — `queue-routing-handlers.ts` — profile-aware task distribution
 
 ### Приоритет 2 — средняя сложность
 
-- [ ] **Python MCP-сервер** — внешний MCP-сервер (FastMCP) чтобы Claude Code мог управлять задачами напрямую: create_task, start_batch, get_status, recover_stuck. У них на TypeScript (3750 строк), нам переписать на Python.
+- [ ] **RDR система (упрощённая)** — 6-уровневая автоэскалация при падении задач. У нас есть recovery (`services/recovery.py`) но без эскалации. RDR добавляет: auto-continue → auto-recover → request changes → fix JSON → debug → recreate.
 
-- [ ] **RDR система (упрощённая)** — автовосстановление застрявших задач. У них 6 уровней эскалации (2876 строк монолит). Нам хватит 2-3 уровня: auto-continue, auto-recover, request changes.
-
-- [ ] **Skill-файлы для Claude Code** — `.claude/skills/` с инструкциями как управлять задачами через MCP и чинить упавшие. Это просто markdown, адаптировать под наш workflow.
+- [ ] **Skill-файлы для Claude Code** — `.claude/skills/` с инструкциями как управлять задачами. Просто markdown, адаптировать под наш workflow.
 
 ### Приоритет 3 — на потом
 
-- [ ] **Auto-Shutdown** — мониторит задачи, шатдаунит систему когда всё done. Полезно для overnight runs. Адаптировать `shutdown` команду под Linux.
+- [ ] **Расширенный MCP-сервер** — у них 15 инструментов (create_task, start_batch, wait_for_review, recover_stuck). У нас базовый MCP есть, но нет batch-операций и recovery через MCP.
 
-- [ ] **Watchdog** — внешний процесс-надзиратель, рестартует Electron при краше. У нас проще через systemd unit.
+- [ ] **Auto-Shutdown** — мониторит задачи, шатдаунит систему когда всё done. Полезно для overnight runs. Адаптировать под Linux.
 
-- [ ] **Auto-Refresh UI** — chokidar следит за plan-файлами, пушит обновления в renderer. Задачи обновляются в реальном времени без ручного рефреша.
+- [ ] **Watchdog** — внешний процесс-надзиратель. У нас проще через systemd unit.
 
 ### Не портировать
 
 - **Window Manager** — Windows-only, PowerShell, слепой paste через Ctrl+V
 - **Output Monitor** — читает JSONL internals Claude Code через regex, хрупко
-- **MiniMax preset** — специфичный провайдер, у нас другие приоритеты
-- **HuggingFace OAuth** — не нужен пока
+- **MiniMax preset** — специфичный провайдер
+- **HuggingFace OAuth** — не нужен
+
+## Разница версий: наш v2.7.6 vs Aperant-MCP v2.7.6-beta.5
+
+Оба на одной базе (v2.7.6), разница минимальная:
+- beta.5 = develop на момент 13 февраля (несколько фиксов до финального release)
+- v2.7.6 stable = develop на 20 февраля (включает все beta-фиксы + merge cleanup)
+- Наш форк = v2.7.6 stable + русификация + UI фиксы
+- Их форк = v2.7.6-beta.5 + MCP/RDR/Watchdog/Per-task provider (444 коммита)
+- Код совместим: те же пути, тот же Python backend, тот же Electron frontend
 
 ## Другие идеи
 
