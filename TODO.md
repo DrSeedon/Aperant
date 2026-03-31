@@ -49,6 +49,12 @@
 - Их форк = v2.7.6-beta.5 + MCP/RDR/Watchdog/Per-task provider (444 коммита)
 - Код совместим: те же пути, тот же Python backend, тот же Electron frontend
 
+## Agent DX (Developer Experience)
+
+- [ ] **complete_subtask() тулза** — сейчас агент тратит 5 tool calls на bookkeeping после каждого subtask'а (read plan → edit plan → read progress → edit progress → git commit). Это 110+ вызовов на 22 subtask'а. Нужна одна MCP-тулза `complete_subtask(subtask_id, summary, files, commit)` которая сама: ставит status=completed в plan, дописывает progress, коммитит, и возвращает следующий pending subtask. Файлы: `apps/backend/auto_claude_tools.py` (MCP-сервер), промпт `coder.md`.
+
+- [ ] **get_next_subtask() тулза** — агент читает весь implementation_plan.json чтобы найти следующий pending. Тулза: парсит plan, возвращает id + description + files следующего subtask'а. Экономит 1 Read + парсинг в контексте агента.
+
 ## UI улучшения
 
 - [ ] **Группировка логов по subtask'ам** — сейчас 900+ записей в Coding фазе идут плоской лентой. Backend уже пишет `subtask_id` в каждую лог-запись (`TaskLogEntry.subtask_id`), но UI (`TaskLogs.tsx`) это поле игнорирует. Нужно: сгруппировать entries по subtask_id через `useMemo`, добавить collapsible `SubtaskLogGroup` между phase и entries, подтянуть название из `task.subtasks`. Только фронтенд, backend не трогать.
