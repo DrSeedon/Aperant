@@ -369,7 +369,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
                 : `subtask-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
               // Defensive fallback: validatePlanData() ensures description exists, but kept for safety
               const description = subtask.description || 'No description available';
-              const title = description; // Title and description are the same for subtasks
+              const title = subtask.title || description;
               const status = (subtask.status as SubtaskStatus) || 'pending';
 
               return {

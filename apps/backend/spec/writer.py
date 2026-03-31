@@ -49,7 +49,7 @@ def create_minimal_plan(spec_dir: Path, task_description: str) -> Path:
 
     plan_file = spec_dir / "implementation_plan.json"
     with open(plan_file, "w", encoding="utf-8") as f:
-        json.dump(plan, f, indent=2)
+        json.dump(plan, f, indent=2, ensure_ascii=False)
 
     return plan_file
 

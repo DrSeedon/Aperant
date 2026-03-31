@@ -170,7 +170,7 @@ def save_requirements(spec_dir: Path, requirements: dict) -> Path:
     """Save requirements to file."""
     requirements_file = spec_dir / "requirements.json"
     with open(requirements_file, "w", encoding="utf-8") as f:
-        json.dump(requirements, f, indent=2)
+        json.dump(requirements, f, indent=2, ensure_ascii=False)
     return requirements_file
 
 

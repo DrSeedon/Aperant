@@ -74,7 +74,7 @@ def run_context_discovery(
                         ctx["task_description"] = task_description or "unknown task"
 
                     with open(context_file, "w", encoding="utf-8") as f:
-                        json.dump(ctx, f, indent=2)
+                        json.dump(ctx, f, indent=2, ensure_ascii=False)
             except (OSError, json.JSONDecodeError, UnicodeDecodeError):
                 context_file.unlink(missing_ok=True)
                 return False, "Invalid context.json created"
@@ -106,7 +106,7 @@ def create_minimal_context(
     }
 
     with open(context_file, "w", encoding="utf-8") as f:
-        json.dump(minimal_context, f, indent=2)
+        json.dump(minimal_context, f, indent=2, ensure_ascii=False)
 
     return context_file
 

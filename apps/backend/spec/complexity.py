@@ -458,6 +458,7 @@ def save_assessment(spec_dir: Path, assessment: ComplexityAssessment) -> Path:
             },
             f,
             indent=2,
+            ensure_ascii=False,
         )
 
     return assessment_file

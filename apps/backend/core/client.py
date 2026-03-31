@@ -900,6 +900,29 @@ def create_client(
         f"and build-progress.txt updates."
     )
 
+    # Include language instruction for non-English UI
+    try:
+        import platform as _plat
+        if _plat.system() == "Linux":
+            _settings_path = Path.home() / ".config" / "aperant" / "settings.json"
+        elif _plat.system() == "Darwin":
+            _settings_path = Path.home() / "Library" / "Application Support" / "aperant" / "settings.json"
+        else:
+            _settings_path = Path(os.environ.get("APPDATA", "")) / "aperant" / "settings.json"
+        if _settings_path.exists():
+            _settings = json.loads(_settings_path.read_text(encoding="utf-8"))
+            _lang = _settings.get("language", "en")
+            if _lang and _lang != "en":
+                _lang_names = {"ru": "Russian", "fr": "French"}
+                _lang_name = _lang_names.get(_lang, _lang)
+                base_prompt = (
+                    f"**LANGUAGE**: Always respond in {_lang_name}. All code comments, "
+                    f"documentation, commit messages, and explanations must be in {_lang_name}.\n\n"
+                    + base_prompt
+                )
+    except Exception:
+        pass
+
     # Include CLAUDE.md if enabled and present
     if should_use_claude_md():
         claude_md_content = load_claude_md(project_dir)

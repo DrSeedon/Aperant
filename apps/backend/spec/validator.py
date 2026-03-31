@@ -24,6 +24,7 @@ def create_minimal_research(spec_dir: Path, reason: str = "No research needed") 
             },
             f,
             indent=2,
+            ensure_ascii=False,
         )
 
     return research_file
@@ -45,6 +46,7 @@ def create_minimal_critique(
             },
             f,
             indent=2,
+            ensure_ascii=False,
         )
 
     return critique_file
@@ -64,6 +66,7 @@ def create_empty_hints(spec_dir: Path, enabled: bool, reason: str) -> Path:
             },
             f,
             indent=2,
+            ensure_ascii=False,
         )
 
     return hints_file
