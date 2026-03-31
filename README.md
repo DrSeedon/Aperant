@@ -1,14 +1,31 @@
-# Auto Claude
+# Aperant (Russian Fork)
+
+> **Fork of [AndyMik90/Aperant](https://github.com/AndyMik90/Aperant)** — rolled back to stable **v2.7.6** with Russian localization and bug fixes.
 
 **Autonomous multi-agent coding framework that plans, builds, and validates software for you.**
 
 ![Auto Claude Kanban Board](.github/assets/Auto-Claude-Kanban.png)
 
+## What's different in this fork
+
+Based on **v2.7.6 stable** (last working release before the broken Python→TypeScript migration in v2.8.0-beta).
+
+### Added
+- **Russian localization** — full UI translation (11 locale files, 3500+ lines), CLDR-compliant pluralization (`_one`/`_few`/`_many`)
+- **Dynamic agent language** — AI agents respond in the language selected in UI settings (injected via Python prompt loader)
+- **Cyrillic-safe JSON** — `ensure_ascii=False` in spec pipeline so Russian text is readable in task files
+
+### Fixed
+- **Subtask title/description duplication** — subtasks no longer show the same text twice in the task detail panel
+- **PhaseProgressIndicator** — tooltip shows description when title is missing
+
+### Why v2.7.6?
+Upstream v2.8.0-beta rewrote the entire Python backend to TypeScript in a single commit, breaking agent execution (`electron.app` import errors in worker threads). The project has 255 unreviewed PRs and the sole maintainer hasn't merged anything since Feb 14. This fork stays on the last stable release that actually works.
+
+---
+
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./agpl-3.0.txt)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KCXaPBr4Dj)
-[![YouTube](https://img.shields.io/badge/YouTube-Subscribe-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/@AndreMikalsen)
-[![CI](https://img.shields.io/github/actions/workflow/status/AndyMik90/Auto-Claude/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/AndyMik90/Auto-Claude/actions)
-[![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/hesreallyhim/awesome-claude-code)
+[![Upstream](https://img.shields.io/badge/upstream-AndyMik90%2FAperant-blue?style=flat-square)](https://github.com/AndyMik90/Aperant)
 
 ---
 
