@@ -51,9 +51,15 @@
 
 ## Agent DX (Developer Experience)
 
-- [ ] **complete_subtask() тулза** — сейчас агент тратит 5 tool calls на bookkeeping после каждого subtask'а (read plan → edit plan → read progress → edit progress → git commit). Это 110+ вызовов на 22 subtask'а. Нужна одна MCP-тулза `complete_subtask(subtask_id, summary, files, commit)` которая сама: ставит status=completed в plan, дописывает progress, коммитит, и возвращает следующий pending subtask. Файлы: `apps/backend/auto_claude_tools.py` (MCP-сервер), промпт `coder.md`.
+- [ ] **complete_subtask()** — объединяет 4-5 tool calls в один: update_status(completed) + append build-progress.txt + git add+commit + return next subtask. Сейчас агент после каждого subtask'а: Read plan → update_subtask_status → Read progress → Edit progress → Bash git commit = 5 вызовов × 22 subtask'а = 110 вызовов впустую. Файл: `apps/backend/agents/tools_pkg/tools/subtask.py`
 
-- [ ] **get_next_subtask() тулза** — агент читает весь implementation_plan.json чтобы найти следующий pending. Тулза: парсит plan, возвращает id + description + files следующего subtask'а. Экономит 1 Read + парсинг в контексте агента.
+- [ ] **get_next_subtask()** — полные данные следующего pending subtask'а: id, description, files_to_modify, files_to_create, patterns_from, verification. Сейчас `get_build_progress` возвращает текстовый отчёт, после чего агент всё равно Read'ит весь plan JSON чтобы достать конкретные поля. Файл: `tools/subtask.py` или `tools/progress.py`
+
+- [ ] **run_verification()** — принимает subtask_id, читает verification из плана, выполняет команду, сравнивает с expected, возвращает pass/fail. Агент сейчас вручную: Read plan → Bash command → сравнивает в голове → пишет результат. Файл: `tools/subtask.py`
+
+- [ ] **append_progress()** — дописывает текст в build-progress.txt одним вызовом. Агент сейчас Read + Edit = 2 вызова каждый раз. Файл: `tools/progress.py`
+
+- [ ] **get_subtask_files()** — по subtask_id возвращает files_to_modify, files_to_create, patterns_from без загрузки всего plan JSON в контекст агента. Файл: `tools/subtask.py`
 
 ## UI улучшения
 
