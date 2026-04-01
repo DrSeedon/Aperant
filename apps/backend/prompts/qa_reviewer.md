@@ -58,13 +58,21 @@ If not running and needed: `chmod +x init.sh && ./init.sh`
 
 Run all unit tests for affected services:
 
+**Always try local first:**
 ```bash
-# Get test commands from project_index.json
-cat project_index.json | jq '.services[].test_command'
+# 1. Try pytest directly (fastest)
+pytest -v --tb=short 2>&1 | head -50
 
-# Run tests for each affected service
-# [Execute test commands based on project_index]
+# 2. If pytest not found, try python -m pytest
+python -m pytest -v --tb=short 2>&1 | head -50
 ```
+
+**DO NOT** use Docker, docker-compose, or Dockerfile for running tests unless:
+- Local pytest fails because of missing system dependencies (database, redis)
+- The project has NO local test setup (only Dockerfile.test)
+- You've already tried local pytest and it cannot work
+
+Docker builds are slow and waste tool calls. Local pytest is instant.
 
 **Document results:**
 ```
