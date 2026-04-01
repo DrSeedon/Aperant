@@ -1,3 +1,39 @@
+## 2.7.7-fork.1 — Russian Fork (2026-04-01)
+
+Based on v2.7.6 stable. Fork: [DrSeedon/Aperant](https://github.com/DrSeedon/Aperant)
+
+### Localization
+- Russian UI translation — 11 locale files, 3500+ lines, CLDR pluralization (_one/_few/_many)
+- Dynamic agent language injection — agents respond in UI-selected language (Python prompt loader)
+- Cyrillic-safe JSON output — `ensure_ascii=False` in spec pipeline
+
+### Agent DX — 61% waste eliminated
+- **4 new MCP tools**: `get_next_subtask`, `run_verification`, `complete_subtask`, `append_progress`
+- `complete_subtask()` replaces 5 manual calls (update plan + progress + git commit) with 1
+- `run_verification()` auto-runs subtask verification and compares expected output
+- `get_next_subtask()` returns full subtask data with dependency checking
+- Subtask + venv info injected into prompt — agent starts ready to code
+- `coder.md` slimmed from 33KB to 20KB — removed 11 mandatory cat commands, pwd rituals, 90-line Python checklist
+- Self-critique scales to complexity: skip for trivial, full review for complex
+- Dev server: check port before starting instead of blind restart
+
+### Planner Optimization
+- Complexity-aware subtask splitting: trivial tasks → 1-2 subtasks (was 6)
+- Anti-patterns documented: no "create directory" or "create __init__" as separate subtasks
+
+### UI Fixes
+- Subtask title/description deduplication
+- Log grouping by subtask_id (collapsible sections inside coding phase)
+- Page title: Auto Claude → Aperant
+- DevTools hidden via `NO_DEVTOOLS=1` env var
+
+### Docs
+- ARCHITECTURE.md — project map for AI agents
+- TODO.md — prioritized roadmap with implementation difficulty
+- README.md — fork description with upstream comparison
+
+---
+
 ## 2.7.6 - Stability & Feature Enhancements
 
 ### ✨ New Features

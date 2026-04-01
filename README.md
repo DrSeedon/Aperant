@@ -8,19 +8,32 @@
 
 ## What's different in this fork
 
-Based on **v2.7.6 stable** (last working release before the broken Python→TypeScript migration in v2.8.0-beta).
+Based on **v2.7.6 stable** → version **2.7.7-fork.1**
 
-### Added
-- **Russian localization** — full UI translation (11 locale files, 3500+ lines), CLDR-compliant pluralization (`_one`/`_few`/`_many`)
-- **Dynamic agent language** — AI agents respond in the language selected in UI settings (injected via Python prompt loader)
-- **Cyrillic-safe JSON** — `ensure_ascii=False` in spec pipeline so Russian text is readable in task files
+### Localization
+- **Russian UI** — 11 locale files (3500+ lines), CLDR pluralization
+- **Dynamic agent language** — agents respond in UI-selected language
+- **Cyrillic-safe JSON** — `ensure_ascii=False` in spec pipeline
 
-### Fixed
-- **Subtask title/description duplication** — subtasks no longer show the same text twice in the task detail panel
-- **PhaseProgressIndicator** — tooltip shows description when title is missing
+### Agent Performance (61% waste → ~15%)
+- **4 new MCP tools** — `complete_subtask`, `get_next_subtask`, `run_verification`, `append_progress`
+- **coder.md** slimmed 33KB → 20KB — removed ritual overhead
+- **Smart splitting** — planner creates 1-2 subtasks for trivial tasks (was 6)
+- **Auto-verification** — `run_verification()` runs test commands and compares output automatically
+
+### UI Fixes
+- Subtask title/description deduplication
+- Log grouping by subtask (collapsible sections)
+- Page title: Aperant
+- DevTools hidden in dev mode (`NO_DEVTOOLS=1`)
+
+### Docs
+- [ARCHITECTURE.md](ARCHITECTURE.md) — project map for AI agents
+- [TODO.md](TODO.md) — prioritized roadmap
+- [CHANGELOG.md](CHANGELOG.md) — full list of changes
 
 ### Why v2.7.6?
-Upstream v2.8.0-beta rewrote the entire Python backend to TypeScript in a single commit, breaking agent execution (`electron.app` import errors in worker threads). The project has 255 unreviewed PRs and the sole maintainer hasn't merged anything since Feb 14. This fork stays on the last stable release that actually works.
+Upstream v2.8.0-beta rewrote the entire Python backend to TypeScript in a single commit, breaking agent execution. The project has 255 unreviewed PRs and the sole maintainer hasn't merged anything since Feb 14. This fork stays on the last stable release that actually works.
 
 ---
 
