@@ -16,6 +16,12 @@
 - [ ] **Auto-Shutdown** — мониторит задачи, шатдаунит систему когда всё done. Адаптировать под Linux.
 - [ ] **Watchdog** — внешний процесс-надзиратель. Проще через systemd unit.
 
+## Промпт оптимизация
+
+- [ ] **qa_reviewer.md** — те же проблемы что были в coder.md: обязательные Read spec/plan/progress при старте, нет MCP tools. По аналогии с coder.md: убрать ручные Read'ы, направить на тулзы, critique по сложности.
+- [ ] **planner.md** — повторные Read одного файла (jobs.py ×5). Добавить правило: не читать один файл дважды.
+- [ ] **Bash tool_input не отображается в логах** — UI показывает "Running / Done" без команды. Нужно показывать что запускалось.
+
 ## UI баги
 
 - [ ] **AI merge resolver для plaintext** — `apps/backend/merge/ai_resolver/` падает на `.gitignore` конфликтах. Для plaintext файлов объединять обе стороны без AI.
