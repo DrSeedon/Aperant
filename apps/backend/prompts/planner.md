@@ -232,6 +232,7 @@ Based on the workflow type and services involved, create the implementation plan
       "subtasks": [
         {
           "id": "subtask-1-1",
+          "model": "sonnet",
           "description": "Create data models for [feature]",
           "service": "backend",
           "files_to_modify": ["src/models/user.py"],
@@ -246,6 +247,7 @@ Based on the workflow type and services involved, create the implementation plan
         },
         {
           "id": "subtask-1-2",
+          "model": "sonnet",
           "description": "Create API endpoints for [feature]",
           "service": "backend",
           "files_to_modify": ["src/routes/api.py"],
@@ -272,6 +274,7 @@ Based on the workflow type and services involved, create the implementation plan
       "subtasks": [
         {
           "id": "subtask-2-1",
+          "model": "sonnet",
           "description": "Create aggregation Celery task",
           "service": "worker",
           "files_to_modify": ["worker/tasks.py"],
@@ -296,6 +299,7 @@ Based on the workflow type and services involved, create the implementation plan
       "subtasks": [
         {
           "id": "subtask-3-1",
+          "model": "haiku",
           "description": "Create dashboard component",
           "service": "frontend",
           "files_to_modify": [],
@@ -320,6 +324,7 @@ Based on the workflow type and services involved, create the implementation plan
       "subtasks": [
         {
           "id": "subtask-4-1",
+          "model": "opus",
           "description": "End-to-end verification of analytics flow",
           "all_services": true,
           "files_to_modify": [],
@@ -398,6 +403,20 @@ subtask-2: Add tests for AdminFilter in tests/test_filters.py
 ```
 
 For **SIMPLE workflow** with ≤5 total files: strongly prefer 1-3 subtasks.
+
+### Model Selection per Subtask (REQUIRED)
+
+Every subtask MUST have a `"model"` field. Choose based on complexity:
+
+| Model | When to use | Examples |
+|-------|-------------|---------|
+| `haiku` | Scaffold, config, boilerplate, __init__.py, .env, simple file creation | Create config.py, add .gitignore entries, scaffold empty component |
+| `sonnet` | CRUD, API endpoints, refactoring, tests, standard logic (DEFAULT) | Implement REST endpoint, write unit tests, refactor module |
+| `opus` | Architecture, multi-service integration, complex algorithms, security | Design plugin system, implement auth flow, E2E verification |
+
+**When in doubt, use `sonnet`** — it handles 90% of coding tasks.
+**Use `haiku` aggressively** for anything that's just creating files with known patterns.
+**Use `opus` sparingly** — only when the subtask requires deep reasoning across multiple files/services.
 
 ### Verification Types
 

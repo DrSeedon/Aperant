@@ -311,6 +311,7 @@ export interface Phase {
 export interface PlanSubtask {
   id: string;
   title?: string;
+  model?: string;
   description: string;
   status: SubtaskStatus;
   verification?: {

@@ -628,7 +628,9 @@ async def run_autonomous_agent(
         # Get the phase-specific model and thinking level (respects task_metadata.json configuration)
         # first_run means we're in planning phase, otherwise coding phase
         current_phase = "planning" if first_run else "coding"
-        phase_model = get_phase_model(spec_dir, current_phase, model)
+        # Per-subtask model override: planner assigns model per subtask (haiku/sonnet/opus)
+        subtask_model_override = next_subtask.get("model") if next_subtask else None
+        phase_model = subtask_model_override or get_phase_model(spec_dir, current_phase, model)
         phase_betas = get_phase_model_betas(spec_dir, current_phase, model)
         thinking_kwargs = get_phase_client_thinking_kwargs(
             spec_dir, current_phase, phase_model
