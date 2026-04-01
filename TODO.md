@@ -4,7 +4,7 @@
 
 - [x] **exitReason tracking** — ✅ СДЕЛАНО
 - [x] **Per-subtask model selection by Planner** — ✅ СДЕЛАНО. haiku/sonnet/opus per subtask.
-- [ ] **Model upgrade on failure** — если subtask зафейлился на haiku, перезапустить на sonnet. Если sonnet зафейлился — на opus. Автоэскалация модели. Файл: `coder.py` в секции recovery/retry.
+- [x] **Model upgrade on failure** — ✅ СДЕЛАНО. haiku→sonnet→opus автоэскалация при фейлах.
 
 ## Приоритет 2 — средняя сложность
 
