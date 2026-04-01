@@ -287,4 +287,120 @@ def create_subtask_tools(spec_dir: Path, project_dir: Path) -> list:
 
     tools.append(get_next_subtask)
 
+    # -------------------------------------------------------------------------
+    # Tool: run_verification
+    # -------------------------------------------------------------------------
+    @tool(
+        "run_verification",
+        "Run the verification command for a subtask. Reads verification from implementation_plan.json, executes the command, compares output with expected result. Returns pass/fail.",
+        {"subtask_id": str},
+    )
+    async def run_verification(args: dict[str, Any]) -> dict[str, Any]:
+        """Run subtask verification command and check result."""
+        import subprocess
+
+        subtask_id = args["subtask_id"]
+        plan_file = spec_dir / "implementation_plan.json"
+
+        if not plan_file.exists():
+            return {
+                "content": [
+                    {"type": "text", "text": "Error: implementation_plan.json not found"}
+                ]
+            }
+
+        try:
+            with open(plan_file, encoding="utf-8") as f:
+                plan = json.load(f)
+
+            # Find subtask
+            verification = None
+            for phase in plan.get("phases", []):
+                for subtask in phase.get("subtasks", []):
+                    if subtask.get("id") == subtask_id:
+                        verification = subtask.get("verification", {})
+                        break
+                if verification is not None:
+                    break
+
+            if verification is None:
+                return {
+                    "content": [
+                        {"type": "text", "text": f"Error: Subtask '{subtask_id}' not found"}
+                    ]
+                }
+
+            v_type = verification.get("type", "")
+            if v_type == "none" or not verification:
+                return {
+                    "content": [
+                        {"type": "text", "text": f"PASS: No verification required for {subtask_id}"}
+                    ]
+                }
+
+            if v_type != "command":
+                return {
+                    "content": [
+                        {"type": "text", "text": f"Verification type '{v_type}' requires manual execution. Command: {verification.get('command', 'N/A')}"}
+                    ]
+                }
+
+            command = verification.get("command", "")
+            expected = verification.get("expected", "")
+
+            if not command:
+                return {
+                    "content": [
+                        {"type": "text", "text": f"Error: No command in verification for {subtask_id}"}
+                    ]
+                }
+
+            # Execute command from project directory
+            try:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=str(project_dir),
+                )
+                output = result.stdout.strip()
+                stderr = result.stderr.strip()
+
+                if expected and expected in output:
+                    return {
+                        "content": [
+                            {"type": "text", "text": f"PASS: Verification for {subtask_id}\nCommand: {command}\nExpected: {expected}\nGot: {output}"}
+                        ]
+                    }
+                elif result.returncode == 0 and not expected:
+                    return {
+                        "content": [
+                            {"type": "text", "text": f"PASS: Command exited 0 for {subtask_id}\nOutput: {output[:500]}"}
+                        ]
+                    }
+                else:
+                    return {
+                        "content": [
+                            {"type": "text", "text": f"FAIL: Verification for {subtask_id}\nCommand: {command}\nExpected: {expected}\nGot: {output}\nStderr: {stderr}\nExit code: {result.returncode}"}
+                        ]
+                    }
+
+            except subprocess.TimeoutExpired:
+                return {
+                    "content": [
+                        {"type": "text", "text": f"FAIL: Command timed out (30s) for {subtask_id}: {command}"}
+                    ]
+                }
+
+        except Exception as e:
+            return {
+                "content": [
+                    {"type": "text", "text": f"Error running verification: {e}"}
+                ]
+            }
+
+    tools.append(run_verification)
+
     return tools

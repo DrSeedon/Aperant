@@ -366,52 +366,15 @@ Use the Task tool to spawn a subagent:
 
 ## STEP 7: VERIFY THE SUBTASK
 
-Every subtask has a `verification` field. Run it.
-
-### Verification Types
-
-**Command Verification:**
-```bash
-# Run the command
-[verification.command]
-# Compare output to verification.expected
+**For command verification** — use the `run_verification` tool:
+```
+Tool: mcp__auto-claude__run_verification
+Input: { "subtask_id": "[your-subtask-id]" }
 ```
 
-**API Verification:**
-```bash
-# For verification.type = "api"
-curl -X [method] [url] -H "Content-Type: application/json" -d '[body]'
-# Check response matches expected_status
-```
+It reads the verification from the plan, executes the command, compares with expected output, returns PASS/FAIL.
 
-**Browser Verification:**
-```
-# For verification.type = "browser"
-# Use puppeteer tools:
-1. puppeteer_navigate to verification.url
-2. puppeteer_screenshot to capture state
-3. Check all items in verification.checks
-```
-
-**E2E Verification:**
-```
-# For verification.type = "e2e"
-# Follow each step in verification.steps
-# Use combination of API calls and browser automation
-```
-
-**Manual Verification:**
-```
-# For verification.type = "manual"
-# Read the instructions field and perform the described check
-# Mark subtask complete only after manual verification passes
-```
-
-**No Verification:**
-```
-# For verification.type = "none"
-# No verification required - mark subtask complete after implementation
-```
+**For browser/e2e/manual verification** — follow the instructions in the verification field manually.
 
 ### FIX BUGS IMMEDIATELY
 
