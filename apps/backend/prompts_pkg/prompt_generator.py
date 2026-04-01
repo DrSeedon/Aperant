@@ -159,26 +159,32 @@ def generate_environment_context(project_dir: Path, spec_dir: Path) -> str:
             generate_worktree_isolation_warning(project_dir, parent_project_path)
         )
 
+    # Load project_index for venv/run info
+    venv_info = ""
+    project_index_file = spec_dir / "project_index.json"
+    if project_index_file.exists():
+        try:
+            pi = json.load(open(project_index_file, encoding="utf-8"))
+            parts = []
+            for svc in pi.get("services", {}).values() if isinstance(pi.get("services"), dict) else pi.get("services", []):
+                if isinstance(svc, dict):
+                    if svc.get("dev_command"):
+                        parts.append(f"- Dev command: `{svc['dev_command']}`")
+                    if svc.get("venv_path"):
+                        parts.append(f"- Venv: `{svc['venv_path']}`")
+                    if svc.get("port"):
+                        parts.append(f"- Port: {svc['port']}")
+            if parts:
+                venv_info = "\n**Project Environment:**\n" + "\n".join(parts) + "\n"
+        except Exception:
+            pass
+
     sections.append(f"""## YOUR ENVIRONMENT
 
 **Working Directory:** `{project_dir}`
 **Spec Location:** `{relative_spec}/`
 {"**Isolation Mode:** WORKTREE (changes are isolated from main project)" if is_worktree else ""}
-
-Your filesystem is restricted to your working directory. All file paths should be
-relative to this location. Do NOT use absolute paths.
-
-**⚠️ CRITICAL:** Before ANY git command or file operation, run `pwd` to verify your current
-directory. If you've used `cd` to change directories, you MUST use paths relative to your
-NEW location, not the working directory. See the PATH CONFUSION PREVENTION section in the
-coder prompt for detailed examples.
-
-**Important Files:**
-- Spec: `{relative_spec}/spec.md`
-- Plan: `{relative_spec}/implementation_plan.json`
-- Progress: `{relative_spec}/build-progress.txt`
-- Context: `{relative_spec}/context.json`
-
+{venv_info}
 ---
 
 """)
@@ -316,31 +322,14 @@ Verify:""")
     # Instructions
     sections.append(f"""## Instructions
 
-1. **Read the pattern files** to understand code style and conventions
-2. **Read the files to modify** (if any) to understand current implementation
-3. **Implement the subtask** following the patterns exactly
-4. **Run verification** and fix any issues
-5. **Commit your changes:**
-   ```bash
-   git add .
-   git commit -m "auto-claude: {subtask_id} - {description[:50]}"
-   ```
-6. **Update the plan** - set this subtask's status to "completed" in implementation_plan.json
+1. Read pattern files and files to modify to understand conventions
+2. Implement the subtask
+3. Run verification: `mcp__auto-claude__run_verification({{"subtask_id": "{subtask_id}"}})`
+4. If FAIL — fix and re-run. If PASS — complete:
+5. `mcp__auto-claude__complete_subtask({{"subtask_id": "{subtask_id}", "summary": "what was done"}})`
 
-## Quality Checklist
-
-Before marking complete, verify:
-- [ ] Follows patterns from reference files
-- [ ] No console.log/print debugging statements
-- [ ] Error handling in place
-- [ ] Verification passes
-- [ ] Clean commit with descriptive message
-
-## Important
-
-- Focus ONLY on this subtask - don't modify unrelated code
-- If verification fails, FIX IT before committing
-- If you encounter a blocker, document it in build-progress.txt
+**DO NOT** manually update plan, commit, or write progress — complete_subtask handles all of it.
+Focus ONLY on this subtask — don't modify unrelated code.
 """)
 
     # Note: Linear updates are now handled by Python orchestrator via linear_updater.py
