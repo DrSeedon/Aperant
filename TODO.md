@@ -51,17 +51,99 @@
 - Их форк = v2.7.6-beta.5 + MCP/RDR/Watchdog/Per-task provider (444 коммита)
 - Код совместим: те же пути, тот же Python backend, тот же Electron frontend
 
-## Agent DX (Developer Experience)
+## Agent DX (Developer Experience) — 61% tool calls впустую
 
-- [ ] **complete_subtask()** — объединяет 4-5 tool calls в один: update_status(completed) + append build-progress.txt + git add+commit + return next subtask. Сейчас агент после каждого subtask'а: Read plan → update_subtask_status → Read progress → Edit progress → Bash git commit = 5 вызовов × 22 subtask'а = 110 вызовов впустую. Файл: `apps/backend/agents/tools_pkg/tools/subtask.py`
+Реальные данные: задача 002 Game-Master, 22 subtask'а, 655 tool calls.
+Полезная работа: 256 (39%). Bookkeeping/waste: 399 (61%).
 
-- [ ] **get_next_subtask()** — полные данные следующего pending subtask'а: id, description, files_to_modify, files_to_create, patterns_from, verification. Сейчас `get_build_progress` возвращает текстовый отчёт, после чего агент всё равно Read'ит весь plan JSON чтобы достать конкретные поля. Файл: `tools/subtask.py` или `tools/progress.py`
+### Проблема 1: Startup ритуал — 87 calls потрачено (13%)
 
-- [ ] **run_verification()** — принимает subtask_id, читает verification из плана, выполняет команду, сравнивает с expected, возвращает pass/fail. Агент сейчас вручную: Read plan → Bash command → сравнивает в голове → пишет результат. Файл: `tools/subtask.py`
+**Что происходит:** coder.md Step 1 (строки 130-205) заставляет агента при КАЖДОЙ сессии выполнить 11 команд: pwd, ls, find plan, cat plan.json, cat spec.md, cat project_index.json, cat context.json, cat build-progress.txt, git log, grep completed/pending, cat memory/*. Это 5-15 tool calls ПЕРЕД первой строкой кода.
 
-- [ ] **append_progress()** — дописывает текст в build-progress.txt одним вызовом. Агент сейчас Read + Edit = 2 вызова каждый раз. Файл: `tools/progress.py`
+**Почему плохо:** spec.md никогда не меняется — зачем читать каждый раз? Plan JSON уже парсится тулзой get_build_progress. Memory файлы можно получить через get_session_context. Агент тратит 30% контекста на ориентацию.
 
-- [ ] **get_subtask_files()** — по subtask_id возвращает files_to_modify, files_to_create, patterns_from без загрузки всего plan JSON в контекст агента. Файл: `tools/subtask.py`
+**Как исправить:**
+- [ ] **Инжектить subtask context в системный промпт** — `prompts_pkg/prompt_generator.py` уже генерирует промпт для конкретного subtask'а. Расширить: добавить поля subtask'а (id, description, files_to_modify, files_to_create, patterns_from, verification) прямо в промпт. Агент стартует уже зная что делать.
+- [ ] **Убрать обязательные cat** из Step 1 — заменить на: "Если нужна дополнительная информация — используй get_build_progress и get_session_context тулзы". Файл: `prompts/coder.md` строки 130-205.
+- [ ] **spec.md — один раз** — инжектить summary из spec.md в системный промпт, убрать cat spec.md из Step 1.
+
+### Проблема 2: Дублирующиеся Read — 98 calls потрачено (15%)
+
+**Что происходит:** Агент читает одни и те же файлы по кругу:
+- implementation_plan.json: 31 Read (нужен 1-2 раза)
+- spec.md: 18 Read (нужен 0 раз — контент не меняется)
+- build-progress.txt: 12 Read (нужен 0 раз — только append)
+- Рабочие файлы (server.py, config.py): повторные Read после того как сам только что написал
+
+**Почему плохо:** Каждый Read = файл целиком в контекст. plan.json + spec.md = ~15KB. При 30 повторных Read = ~450KB контекста впустую.
+
+**Как исправить:**
+- [ ] **get_next_subtask() тулза** — возвращает полные данные pending subtask'а: id, description, files_to_modify, files_to_create, patterns_from, verification, phase_name. Агенту не надо Read'ить план. Файл: `tools/subtask.py`
+- [ ] **get_subtask_files() тулза** — по subtask_id возвращает только files без загрузки всего JSON. Файл: `tools/subtask.py`
+- [ ] **Убрать "Read plan to find next subtask" из Step 3** (строки 245-256) — заменить на вызов get_next_subtask(). Файл: `prompts/coder.md`
+
+### Проблема 3: Git overhead — 67 calls потрачено (10%)
+
+**Что происходит:** coder.md Step 9 (строки 753-823) требует Mandatory Path Verification перед КАЖДЫМ git add: pwd → ls → verify → git add → git commit. При 19 subtask'ах = 3.5 git операции на subtask.
+
+Плюс Step 6 (строка 468-477) — "MANDATORY: Before implementing anything, confirm where you are: pwd" перед каждой записью.
+
+**Как исправить:**
+- [ ] **complete_subtask() тулза** — объединяет: update_status(completed) + append build-progress.txt + git add+commit + return next subtask. ОДИН вызов вместо 5. Файл: `tools/subtask.py`
+- [ ] **Убрать Mandatory Pre-Command Check** (строки 111-126) — pwd перед каждым git это паранойя. Достаточно одного pwd при старте сессии. Файл: `prompts/coder.md`
+- [ ] **Убрать pwd из Step 6** (строки 468-477) — агент уже знает где он после Step 1. Файл: `prompts/coder.md`
+
+### Проблема 4: Server start loops — 49 calls потрачено (7.5%)
+
+**Что происходит:** Step 4 (строки 262-284) требует запускать dev environment перед каждым subtask'ом. Агент пытается: uvicorn → fail → uv run → fail → timeout → fail → ищет venv по всем папкам (42 команды типа `find .venv`, `ls -la ../.venv`).
+
+**Как исправить:**
+- [ ] **Передавать venv_path и run_command в контексте** — `prompt_generator.py` уже знает project_index.json где есть dev_command и venv path. Инжектить в промпт: "Твой venv: ./.venv, запуск: uv run uvicorn ...". Файл: `prompts_pkg/prompt_generator.py`
+- [ ] **Step 4 — только для первого subtask'а** — если сервер уже запущен (порт занят), не перезапускать. Добавить проверку `lsof -i:PORT` перед запуском. Файл: `prompts/coder.md` строки 262-284.
+
+### Проблема 5: Self-Critique overhead — 15+ calls потрачено
+
+**Что происходит:** Step 6.5 (строки 543-675) — MANDATORY Self-Critique Checklist с 25+ пунктами. Агент реально проходит каждый пункт, запускает echo-команды, перечитывает файлы для проверки. На тривиальном subtask'е (создать config.py) — это overkill.
+
+**Как исправить:**
+- [ ] **Привязать critique к сложности subtask'а** — тривиальные (1 файл, scaffold) → skip critique. Средние → краткий checklist (5 пунктов). Сложные → полный. Связать с полем `model` из Smart Model Selection. Файл: `prompts/coder.md` строки 543-675.
+
+### Проблема 6: Planner over-splitting — 6 subtask'ов на тривиальную задачу
+
+**Что происходит:** planner.md строка 362: "Small scope — Each subtask should take 1-3 files max". Planner послушно нарезает AdminFilter (тривиальная задача: 1 файл создать, 1 изменить) на 6 subtask'ов: создать директорию, создать класс, создать __init__, рефакторинг, тесты, запуск тестов. Claude Code сделал бы это за 30 секунд одним действием.
+
+**Почему плохо:** 6 subtask'ов × ~30 tool calls overhead = ~180 tool calls на задачу которая стоит 5. Плюс 6 сессий = 6 startup ритуалов.
+
+**Как исправить:**
+- [ ] **Добавить правило слияния в planner.md** — "Для SIMPLE workflow: если все subtask'и в одном сервисе и ≤5 файлов суммарно → объединить в 1-2 subtask'а. Не нарезать 'создать директорию' и 'создать __init__.py' как отдельные subtask'и — это одна операция." Файл: `prompts/planner.md`, секция Subtask Guidelines (строки 359-364).
+- [ ] **Complexity-aware splitting** — planner уже знает complexity assessment (trivial/low/medium/high/critical из complexity_assessor.md). Привязать гранулярность: trivial → 1-2 subtask'а max, low → 3-5, medium → 5-10, high/critical → без лимита. Файл: `prompts/planner.md`
+
+### Проблема 7: build-progress.txt — 23 calls потрачено
+
+**Что происходит:** Step 10 (строки 834-856) требует Read + APPEND подробного отчёта после каждого subtask'а. Формат: 10 строк с датой, service, files modified, verification result, next subtask.
+
+**Как исправить:**
+- [ ] **append_progress() тулза** — одним вызовом дописывает текст. Без Read. Файл: `tools/progress.py`
+- [ ] **Или включить в complete_subtask()** — summary передаётся как параметр, тулза сама формирует и дописывает.
+
+### Проблема 8: Verification без автоматизации — ~30 calls
+
+**Что происходит:** Каждый subtask имеет verification (command + expected). Агент вручную: Read plan → находит verification → Bash command → сравнивает вывод глазами → пишет результат. Часто создаёт temp файлы (test_config_debug.py) → запускает → удаляет = 3-5 лишних calls.
+
+**Как исправить:**
+- [ ] **run_verification() тулза** — принимает subtask_id, читает verification из плана, выполняет command, сравнивает с expected, возвращает pass/fail с diff. Файл: `tools/subtask.py`
+
+### Сводка: потенциальная экономия
+
+| Фикс | Экономия calls | Экономия контекста | Сложность |
+|------|---------------|-------------------|-----------|
+| Инжекция subtask в промпт | ~80 | ~30% | Средняя |
+| complete_subtask() тулза | ~87 | ~15% | Средняя |
+| get_next_subtask() тулза | ~50 | ~20% | Лёгкая |
+| Убрать pwd-ритуалы из промпта | ~45 | ~5% | Лёгкая |
+| run_verification() тулза | ~30 | ~5% | Лёгкая |
+| Planner smart splitting | ~100+ | ~50% (меньше сессий) | Средняя |
+| **Итого** | **~390 из 399 waste** | **~70% контекста** | — |
 
 ## Smart Model Selection
 
