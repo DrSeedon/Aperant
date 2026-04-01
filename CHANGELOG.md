@@ -2,6 +2,19 @@
 
 Based on v2.7.6 stable. Fork: [DrSeedon/Aperant](https://github.com/DrSeedon/Aperant)
 
+### Real-world benchmark: Task 002 (before) vs Task 003 (after)
+
+Same project (Claude-Code-Game-Master), similar complexity (web client features).
+
+| Metric | Task 002 (upstream prompt) | Task 003 (fork prompt) | Improvement |
+|--------|--------------------------|----------------------|-------------|
+| Subtasks | 22 | 14 | **-36%** |
+| Coding tool calls | 704 | 173 | **-75%** |
+| Tools per subtask | ~32 | ~12 | **-63%** |
+| MCP tool usage | 7 (manual bookkeeping) | 25 (automated) | complete_subtask ×14, run_verification ×10 |
+| Model selection | all opus | haiku ×1, sonnet ×12, opus ×1 | cost-aware |
+| Log entries | 1764 | 487 | **-72%** |
+
 ### Localization
 - Russian UI translation — 11 locale files, 3500+ lines, CLDR pluralization (_one/_few/_many)
 - Dynamic agent language injection — agents respond in UI-selected language (Python prompt loader)
