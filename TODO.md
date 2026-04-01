@@ -155,7 +155,7 @@
 | 8   | complete_subtask() тулза               | ~87 calls, ~15% ctx | 🟡        | ✅ СДЕЛАНО |
 | 9   | Инжекция subtask в промпт              | ~80 calls, ~30% ctx | 🟡        | ✅ СДЕЛАНО |
 | 10  | venv/run_command в контексте           | ~42 calls           | 🟡        | ✅ СДЕЛАНО |
-| 11  | Planner smart splitting                | ~100+ calls         | 🔴        | ⬜         |
+| 11  | Planner smart splitting                | ~100+ calls         | 🔴        | ✅ СДЕЛАНО |
 
 
 **Следующий шаг:** фиксы 6 (append_progress, 🟢, 15 мин) → 5 (get_next_subtask) → 8 (complete_subtask) → 9 (инжекция subtask).
