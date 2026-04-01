@@ -231,16 +231,60 @@ def generate_subtask_prompt(
     # Environment context first
     sections.append(generate_environment_context(project_dir, spec_dir))
 
+    # Inject spec summary (spec.md never changes — inject once, don't make agent Read it)
+    spec_summary = ""
+    spec_file = spec_dir / "spec.md"
+    if spec_file.exists():
+        try:
+            spec_text = spec_file.read_text(encoding="utf-8")
+            # Take first 2000 chars as summary (title + requirements + key decisions)
+            if len(spec_text) > 2000:
+                spec_summary = spec_text[:2000] + "\n... (truncated)"
+            else:
+                spec_summary = spec_text
+        except Exception:
+            pass
+
+    # Inject build progress summary (so agent knows what's done without reading file)
+    progress_summary = ""
+    try:
+        plan_file = spec_dir / "implementation_plan.json"
+        if plan_file.exists():
+            plan_data = json.load(open(plan_file, encoding="utf-8"))
+            completed = sum(
+                1 for p in plan_data.get("phases", [])
+                for s in p.get("subtasks", [])
+                if s.get("status") == "completed"
+            )
+            total = sum(
+                len(p.get("subtasks", []))
+                for p in plan_data.get("phases", [])
+            )
+            progress_summary = f"**Progress:** {completed}/{total} subtasks completed"
+    except Exception:
+        pass
+
     # Header
     sections.append(f"""# Subtask Implementation Task
 
 **Subtask ID:** `{subtask_id}`
 **Phase:** {phase.get("name", phase.get("id", "Unknown"))}
 **Service:** {service}
+**Model:** {subtask.get("model", "default")}
+{progress_summary}
 
 ## Description
 
 {description}
+""")
+
+    # Spec context (injected so agent doesn't need to Read spec.md)
+    if spec_summary:
+        sections.append(f"""## Spec Summary (read-only context)
+
+{spec_summary}
+
+---
 """)
 
     # Recovery context if this is a retry
