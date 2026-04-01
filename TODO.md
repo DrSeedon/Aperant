@@ -133,17 +133,25 @@
 **Как исправить:**
 - [ ] **run_verification() тулза** — принимает subtask_id, читает verification из плана, выполняет command, сравнивает с expected, возвращает pass/fail с diff. Файл: `tools/subtask.py`
 
-### Сводка: потенциальная экономия
+### Сводка: потенциальная экономия + сложность внедрения
 
-| Фикс | Экономия calls | Экономия контекста | Сложность |
-|------|---------------|-------------------|-----------|
-| Инжекция subtask в промпт | ~80 | ~30% | Средняя |
-| complete_subtask() тулза | ~87 | ~15% | Средняя |
-| get_next_subtask() тулза | ~50 | ~20% | Лёгкая |
-| Убрать pwd-ритуалы из промпта | ~45 | ~5% | Лёгкая |
-| run_verification() тулза | ~30 | ~5% | Лёгкая |
-| Planner smart splitting | ~100+ | ~50% (меньше сессий) | Средняя |
-| **Итого** | **~390 из 399 waste** | **~70% контекста** | — |
+| # | Фикс | Экономия | Сложность | Что менять | Время |
+|---|------|----------|-----------|-----------|-------|
+| 1 | Убрать pwd-ритуалы из промпта | ~45 calls | 🟢 Лёгкая | Удалить строки из `coder.md` | 10 мин |
+| 2 | Убрать обязательные cat из Step 1 | ~40 calls | 🟢 Лёгкая | Переписать Step 1 в `coder.md` | 15 мин |
+| 3 | Step 4 — проверять порт перед запуском | ~49 calls | 🟢 Лёгкая | Добавить `lsof` check в `coder.md` | 5 мин |
+| 4 | Critique по сложности | ~15 calls | 🟢 Лёгкая | Условие в `coder.md` Step 6.5 | 10 мин |
+| 5 | get_next_subtask() тулза | ~50 calls, ~20% ctx | 🟡 Средняя | Новая функция в `tools/subtask.py`, регистрация в `models.py` | 30 мин |
+| 6 | append_progress() тулза | ~23 calls | 🟢 Лёгкая | Новая функция в `tools/progress.py` | 15 мин |
+| 7 | run_verification() тулза | ~30 calls | 🟡 Средняя | Новая функция в `tools/subtask.py`, subprocess.run | 30 мин |
+| 8 | complete_subtask() тулза | ~87 calls, ~15% ctx | 🟡 Средняя | Комбо: update status + progress + git + next. `tools/subtask.py` | 45 мин |
+| 9 | Инжекция subtask в промпт | ~80 calls, ~30% ctx | 🟡 Средняя | `prompt_generator.py` — добавить subtask data в промпт | 30 мин |
+| 10 | venv/run_command в контексте | ~42 calls | 🟡 Средняя | `prompt_generator.py` — читать project_index, инжектить пути | 20 мин |
+| 11 | Planner smart splitting | ~100+ calls | 🔴 Сложная | `planner.md` — переписать Subtask Guidelines, complexity rules | 1-2 часа |
+
+**Рекомендуемый порядок:** сначала 🟢 (40 мин, чистка промптов), потом 🟡 тулзы (2.5 часа), потом 🔴 planner (1-2 часа).
+
+**ROI:** фиксы 1-4 (чистка промптов) = 40 мин работы → ~150 calls экономии на каждую задачу. Это самый жирный ROI.
 
 ## Smart Model Selection
 
