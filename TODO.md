@@ -21,10 +21,11 @@
 - [x] **qa_reviewer.md** — ✅ СДЕЛАНО. Phase 0 на тулзах, spec.md injected, port check
 - [x] **planner.md** — ✅ СДЕЛАНО. Efficiency rules, no pwd/ls, use get_session_context
 - [x] **Bash tool_input в QA логах** — ✅ СДЕЛАНО. reviewer.py теперь показывает command
+- [x] **Auto-resolve JSON/plaintext merge conflicts** — ✅ СДЕЛАНО. workspace.py: JSON deep-merge + plaintext line-merge. Без AI.
+- [x] **UsageMonitor 429 backoff** — ✅ СДЕЛАНО. 5 мин пауза после rate limit вместо спама каждые 30 сек.
 
 ## UI баги
 
-- [ ] **AI merge resolver для plaintext** — `apps/backend/merge/ai_resolver/` падает на `.gitignore` конфликтах. Для plaintext файлов объединять обе стороны без AI.
 - [ ] **Кнопка "Слить с AI" disable при uncommitted changes** — UI показывает warning но кнопка активна.
 
 ## Другие идеи
