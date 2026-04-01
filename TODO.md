@@ -2,8 +2,7 @@
 
 ## Приоритет 1 — высокая отдача
 
-- [x] **exitReason tracking** — `_save_exit_reason()` в `coder.py`. Пишет причину падения в `implementation_plan.json` (complete, concurrency_limit, rate_limit, max_iterations). ✅ СДЕЛАНО
-- [ ] **Per-task provider selection** — каждая задача юзает свой API профиль. `providerId` в `task_metadata.json` → env override → agent. Референс: Aperant-MCP коммит `c776af7`.
+- [x] **exitReason tracking** — ✅ СДЕЛАНО
 - [ ] **Per-subtask model selection by Planner** — Planner выбирает модель для каждого subtask'а: haiku для scaffold, sonnet для CRUD, opus для архитектуры. Поле `model` в subtask schema. Файлы: `planner.md`, `coder.py`, `task.ts`.
 
 ## Приоритет 2 — средняя сложность
@@ -15,6 +14,7 @@
 
 ## Приоритет 3 — на потом
 
+- [ ] **Per-task provider selection** — каждая задача юзает свой API профиль. Актуально при 2+ аккаунтах или API credits. Референс: Aperant-MCP коммит `c776af7`.
 - [ ] **Auto-Shutdown** — мониторит задачи, шатдаунит систему когда всё done. Адаптировать под Linux.
 - [ ] **Watchdog** — внешний процесс-надзиратель. Проще через systemd unit.
 
