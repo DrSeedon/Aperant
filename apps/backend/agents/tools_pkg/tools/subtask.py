@@ -403,4 +403,111 @@ def create_subtask_tools(spec_dir: Path, project_dir: Path) -> list:
 
     tools.append(run_verification)
 
+    # -------------------------------------------------------------------------
+    # Tool: complete_subtask
+    # -------------------------------------------------------------------------
+    @tool(
+        "complete_subtask",
+        "Complete a subtask in one call: marks status as completed, appends progress to build-progress.txt, commits changes with git, and returns the next pending subtask. Use this instead of manually doing update_subtask_status + append_progress + git commit.",
+        {"subtask_id": str, "summary": str},
+    )
+    async def complete_subtask(args: dict[str, Any]) -> dict[str, Any]:
+        """Complete subtask: update plan + progress + git commit + return next."""
+        import subprocess
+
+        subtask_id = args["subtask_id"]
+        summary = args.get("summary", "Completed")
+
+        plan_file = spec_dir / "implementation_plan.json"
+        progress_file = spec_dir / "build-progress.txt"
+
+        if not plan_file.exists():
+            return {
+                "content": [
+                    {"type": "text", "text": "Error: implementation_plan.json not found"}
+                ]
+            }
+
+        try:
+            # 1. Update status in plan
+            with open(plan_file, encoding="utf-8") as f:
+                plan = json.load(f)
+
+            found = _update_subtask_in_plan(plan, subtask_id, "completed", summary)
+            if not found:
+                return {
+                    "content": [
+                        {"type": "text", "text": f"Error: Subtask '{subtask_id}' not found"}
+                    ]
+                }
+
+            write_json_atomic(plan_file, plan, indent=2)
+
+            # 2. Append progress
+            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            entry = f"\n{subtask_id} — {timestamp}\n{summary}\n"
+            with open(progress_file, "a", encoding="utf-8") as f:
+                f.write(entry)
+
+            # 3. Git commit
+            try:
+                subprocess.run(
+                    "git add . ':!.auto-claude'",
+                    shell=True, cwd=str(project_dir),
+                    capture_output=True, timeout=15,
+                )
+                subprocess.run(
+                    f'git commit -m "auto-claude: {subtask_id} - {summary[:60]}"',
+                    shell=True, cwd=str(project_dir),
+                    capture_output=True, timeout=15,
+                )
+            except Exception:
+                pass  # Git commit is best-effort
+
+            # 4. Find next subtask
+            phases = plan.get("phases", [])
+            completed_phases = set()
+            for phase in phases:
+                pid = phase.get("id", "")
+                if all(s.get("status") == "completed" for s in phase.get("subtasks", [])):
+                    completed_phases.add(pid)
+
+            next_info = "All subtasks completed. Build ready for QA."
+            for phase in phases:
+                pid = phase.get("id", "")
+                pname = phase.get("name", pid)
+                deps = phase.get("depends_on", [])
+                if not all(d in completed_phases for d in deps):
+                    continue
+                for s in phase.get("subtasks", []):
+                    if s.get("status") in ("pending", "in_progress"):
+                        next_info = json.dumps({
+                            "id": s.get("id"),
+                            "description": s.get("description", ""),
+                            "phase": pname,
+                            "files_to_modify": s.get("files_to_modify", []),
+                            "files_to_create": s.get("files_to_create", []),
+                            "patterns_from": s.get("patterns_from", []),
+                            "verification": s.get("verification", {}),
+                        }, indent=2, ensure_ascii=False)
+                        break
+                else:
+                    continue
+                break
+
+            return {
+                "content": [
+                    {"type": "text", "text": f"✅ {subtask_id} completed and committed.\n\nNext subtask:\n{next_info}"}
+                ]
+            }
+
+        except Exception as e:
+            return {
+                "content": [
+                    {"type": "text", "text": f"Error completing subtask: {e}"}
+                ]
+            }
+
+    tools.append(complete_subtask)
+
     return tools

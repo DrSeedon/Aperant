@@ -384,52 +384,22 @@ The next session has no memory. You are the only one who can fix it efficiently.
 
 ---
 
-## STEP 8: UPDATE implementation_plan.json
+## STEPS 8-10: COMPLETE THE SUBTASK (one tool call)
 
-After successful verification, update the subtask:
-
-```json
-"status": "completed"
+Use `complete_subtask` — it does everything in one call:
+```
+Tool: mcp__auto-claude__complete_subtask
+Input: { "subtask_id": "[subtask-id]", "summary": "What was done" }
 ```
 
-**ONLY change the status field. Never modify:**
-- Subtask descriptions
-- File lists
-- Verification criteria
-- Phase structure
+This tool:
+1. Marks subtask as completed in implementation_plan.json
+2. Appends progress to build-progress.txt
+3. Commits changes with git (excluding .auto-claude/)
+4. Returns the next pending subtask with full details
 
----
-
-## STEP 9: COMMIT YOUR PROGRESS
-
-```bash
-git add . ':!.auto-claude'
-git commit -m "auto-claude: [subtask-id] - [short description]"
-```
-
-The `:!.auto-claude` exclusion ensures spec files are never committed.
-
-If git add fails — check `pwd` and adjust paths. If commit is blocked by secret scanning — move secrets to env vars and retry.
-
-### DO NOT Push to Remote
-
-**IMPORTANT**: Do NOT run `git push`. All work stays local until the user reviews and approves.
-The user will push to remote after reviewing your changes in the isolated workspace.
-
-**Note**: Memory files (attempt_history.json, build_commits.json) are automatically
-updated by the orchestrator after each session. You don't need to update them manually.
-
----
-
-## STEP 10: UPDATE build-progress.txt
-
-Use the `append_progress` tool:
-```
-Tool: mcp__auto-claude__append_progress
-Input: { "subtask_id": "[subtask-id]", "summary": "What was done, files modified, verification result" }
-```
-
-**DO NOT** read build-progress.txt first — the tool appends directly.
+**DO NOT** manually update plan, commit, or write progress — the tool handles all of it.
+**DO NOT** run `git push` — all work stays local until user reviews.
 
 ---
 
