@@ -70,6 +70,25 @@ except ImportError:
         return False
 
 
+def _update_shared_project_context(project_dir: Path, spec_name: str) -> None:
+    """Copy per-spec project_index.json to shared .auto-claude/project_index.json after merge."""
+    import json as _json
+    try:
+        spec_pi = project_dir / ".auto-claude" / "specs" / spec_name / "project_index.json"
+        shared_pi = project_dir / ".auto-claude" / "project_index.json"
+        if spec_pi.exists():
+            spec_data = _json.loads(spec_pi.read_text(encoding="utf-8"))
+            # Only update if spec version has services (not empty)
+            if spec_data.get("services"):
+                shared_pi.write_text(
+                    _json.dumps(spec_data, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+                print_status("Shared project context updated", "success")
+    except Exception:
+        pass  # Non-critical — don't fail merge
+
+
 # Import merge system
 from core.workspace.display import (
     print_conflict_info as _print_conflict_info,
@@ -281,6 +300,7 @@ def merge_existing_build(
                     _print_merge_success(
                         no_commit, stats, spec_name=spec_name, keep_worktree=True
                     )
+                    _update_shared_project_context(project_dir, spec_name)
 
                     # Don't auto-delete worktree - let user test and manually cleanup
                     # User can delete with: python auto-claude/run.py --spec <name> --discard
@@ -297,6 +317,7 @@ def merge_existing_build(
                         _print_merge_success(
                             no_commit, stats, spec_name=spec_name, keep_worktree=True
                         )
+                        _update_shared_project_context(project_dir, spec_name)
                         return True
                     else:
                         # Standard git merge failed - report error and don't continue
@@ -356,6 +377,7 @@ def merge_existing_build(
             print()
             print("When satisfied, delete the worktree:")
             print(muted(f"  python auto-claude/run.py --spec {spec_name} --discard"))
+        _update_shared_project_context(project_dir, spec_name)
         return True
     else:
         # Git merge failed — try auto-resolving simple conflicts (JSON, plaintext)
@@ -373,6 +395,7 @@ def merge_existing_build(
                     )
                 print()
                 print_status(f"Auto-resolved {resolved} conflict(s) and merged.", "success")
+                _update_shared_project_context(project_dir, spec_name)
                 return True
             else:
                 print()

@@ -29,14 +29,19 @@ Subtasks respect dependencies. The frontend can't show data the backend doesn't 
 
 ### 0.1: Understand Project Structure
 
-Use the `get_session_context` tool first — it may have codebase map and patterns from previous sessions.
+**Check for shared project context first:**
+```bash
+cat ../../project_index.json 2>/dev/null
+```
 
-If not available, explore the project:
+If shared project_index.json exists — **skip directory exploration**. The project structure is already known from previous tasks. Focus only on task-specific files from spec.md.
+
+Use the `get_session_context` tool for patterns and gotchas from previous sessions.
+
+**Only if NO shared context exists**, explore the project:
 ```bash
 find . -type f -name "*.py" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js" | head -100
 ```
-
-**DO NOT** run `pwd` and `ls -la` — your working directory is in the environment context above.
 
 ### 0.2: Analyze Existing Patterns for the Feature
 
@@ -89,13 +94,18 @@ Find these critical sections:
 
 ### 1.2: Read OR CREATE the Project Index
 
+**Check for shared project context first** (from previous tasks):
 ```bash
-cat project_index.json
+# Shared context from previous tasks (most reliable — updated after each merge)
+cat ../../project_index.json 2>/dev/null || cat project_index.json 2>/dev/null || echo "NOT FOUND"
 ```
 
-**IF THIS FILE DOES NOT EXIST, YOU MUST CREATE IT USING THE WRITE TOOL.**
+If found — **use it, don't recreate**. Copy to spec dir for compatibility:
+```bash
+cp ../../project_index.json ./project_index.json 2>/dev/null
+```
 
-Based on your Phase 0 investigation, use the Write tool to create `project_index.json`:
+**Only create from scratch if NOT FOUND.** Use the Write tool to create `project_index.json`:
 
 ```json
 {

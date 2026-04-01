@@ -160,8 +160,12 @@ def generate_environment_context(project_dir: Path, spec_dir: Path) -> str:
         )
 
     # Load project_index for venv/run info
+    # Try shared context first (.auto-claude/project_index.json), then per-spec fallback
     venv_info = ""
+    shared_project_index = spec_dir.parent.parent / "project_index.json" if spec_dir.parent.name == "specs" else None
     project_index_file = spec_dir / "project_index.json"
+    if shared_project_index and shared_project_index.exists():
+        project_index_file = shared_project_index
     if project_index_file.exists():
         try:
             pi = json.load(open(project_index_file, encoding="utf-8"))
