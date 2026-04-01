@@ -61,6 +61,10 @@
 
 - [ ] **get_subtask_files()** — по subtask_id возвращает files_to_modify, files_to_create, patterns_from без загрузки всего plan JSON в контекст агента. Файл: `tools/subtask.py`
 
+## Smart Model Selection
+
+- [ ] **Per-subtask model selection by Planner** — Planner (Opus, high thinking) уже видит сложность каждого subtask'а. Добавить поле `model: "haiku" | "sonnet" | "opus"` в subtask schema. Planner при планировании выбирает модель: haiku для scaffold/config, sonnet для CRUD/API, opus для архитектуры/сложной логики. Coder.py читает `subtask.model` и передаёт в `create_client()`. Три файла: `prompts/planner.md` (schema + инструкция), `agents/coder.py` (читать model), `shared/types/task.ts` (тип). Ноль доп. API calls — Planner уже запущен.
+
 ## UI улучшения
 
 - [ ] **Группировка логов по subtask'ам** — сейчас 900+ записей в Coding фазе идут плоской лентой. Backend уже пишет `subtask_id` в каждую лог-запись (`TaskLogEntry.subtask_id`), но UI (`TaskLogs.tsx`) это поле игнорирует. Нужно: сгруппировать entries по subtask_id через `useMemo`, добавить collapsible `SubtaskLogGroup` между phase и entries, подтянуть название из `task.subtasks`. Только фронтенд, backend не трогать.
