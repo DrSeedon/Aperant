@@ -359,9 +359,45 @@ Use ONLY these values for the `type` field in phases:
 ### Subtask Guidelines
 
 1. **One service per subtask** - Never mix backend and frontend in one subtask
-2. **Small scope** - Each subtask should take 1-3 files max
-3. **Clear verification** - Every subtask must have a way to verify it works
-4. **Explicit dependencies** - Phases block until dependencies complete
+2. **Clear verification** - Every subtask must have a way to verify it works
+3. **Explicit dependencies** - Phases block until dependencies complete
+
+### Subtask Granularity (CRITICAL — match to complexity)
+
+**DO NOT over-split simple tasks.** Each subtask has overhead: startup, context loading, git commit, progress update. Too many subtasks = more overhead than actual work.
+
+**Rules by complexity:**
+
+| Complexity | Max subtasks | Guideline |
+|-----------|-------------|-----------|
+| **trivial** (1-2 files, config, rename) | **1-2** | One subtask for implementation, optionally one for tests |
+| **low** (3-5 files, single module) | **3-5** | Group related files into one subtask |
+| **medium** (5-10 files, multiple modules) | **5-10** | One subtask per logical unit |
+| **high/critical** (10+ files, multi-service) | **no limit** | Split as needed for safety |
+
+**Anti-patterns — NEVER do these:**
+- ❌ "Create directory" as a separate subtask — directories are created with files
+- ❌ "Create `__init__.py`" as a separate subtask — it's part of creating the module
+- ❌ "Run tests" as a separate subtask — tests are verification of the previous subtask
+- ❌ 6 subtasks for a task that changes 2 files
+
+**Example — WRONG (over-split):**
+```
+subtask-1: Create bot/filters/ directory and __init__.py
+subtask-2: Create AdminFilter class
+subtask-3: Update __init__.py exports
+subtask-4: Refactor admin.py to use AdminFilter
+subtask-5: Write tests
+subtask-6: Run tests
+```
+
+**Example — CORRECT (properly scoped):**
+```
+subtask-1: Create AdminFilter in bot/filters/admin.py and apply to admin.py router
+subtask-2: Add tests for AdminFilter in tests/test_filters.py
+```
+
+For **SIMPLE workflow** with ≤5 total files: strongly prefer 1-3 subtasks.
 
 ### Verification Types
 
