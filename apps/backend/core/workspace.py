@@ -358,10 +358,119 @@ def merge_existing_build(
             print(muted(f"  python auto-claude/run.py --spec {spec_name} --discard"))
         return True
     else:
+        # Git merge failed — try auto-resolving simple conflicts (JSON, plaintext)
+        resolved = _try_auto_resolve_simple_conflicts(project_dir)
+        if resolved > 0:
+            # Check if all conflicts resolved
+            result = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=project_dir)
+            unresolved = [f for f in result.stdout.strip().split("\n") if f.strip()] if result.returncode == 0 and result.stdout.strip() else []
+            if not unresolved:
+                run_git(["add", "."], cwd=project_dir)
+                if not no_commit:
+                    run_git(
+                        ["commit", "-m", f"merge: auto-resolve {resolved} conflict(s) from auto-claude/{spec_name}"],
+                        cwd=project_dir,
+                    )
+                print()
+                print_status(f"Auto-resolved {resolved} conflict(s) and merged.", "success")
+                return True
+            else:
+                print()
+                print_status(f"Auto-resolved {resolved} file(s), but {len(unresolved)} remain:", "warning")
+                for f in unresolved:
+                    print(f"  - {f}")
+
         print()
         print_status("There was a conflict merging the changes.", "error")
         print(muted("You may need to merge manually."))
         return False
+
+
+def _try_auto_resolve_simple_conflicts(project_dir: Path) -> int:
+    """
+    Try to auto-resolve simple conflicts in JSON and plaintext files.
+
+    For JSON: parse both sides, deep-merge keys (theirs wins on conflict).
+    For plaintext (.gitignore, .md, .txt, .env): concatenate unique lines from both sides.
+
+    Returns number of files resolved. Does not touch files it can't handle.
+    """
+    import json as _json
+
+    # Find conflicted files
+    result = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=project_dir)
+    if result.returncode != 0 or not result.stdout.strip():
+        return 0
+
+    conflicted = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
+    resolved_count = 0
+
+    for filepath in conflicted:
+        full_path = project_dir / filepath
+        ext = full_path.suffix.lower()
+
+        try:
+            if ext == ".json":
+                # JSON merge: get ours and theirs from git, deep-merge
+                ours_result = run_git(["show", f":2:{filepath}"], cwd=project_dir)
+                theirs_result = run_git(["show", f":3:{filepath}"], cwd=project_dir)
+
+                if ours_result.returncode != 0 or theirs_result.returncode != 0:
+                    continue
+
+                ours_data = _json.loads(ours_result.stdout)
+                theirs_data = _json.loads(theirs_result.stdout)
+
+                # Deep merge: theirs wins on key conflicts
+                merged = _deep_merge_dicts(ours_data, theirs_data)
+                full_path.write_text(
+                    _json.dumps(merged, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+                run_git(["add", filepath], cwd=project_dir)
+                resolved_count += 1
+                print_status(f"Auto-resolved JSON conflict: {filepath}", "success")
+
+            elif ext in (".gitignore", ".md", ".txt", ".env"):
+                # Plaintext merge: combine unique lines from both sides
+                ours_result = run_git(["show", f":2:{filepath}"], cwd=project_dir)
+                theirs_result = run_git(["show", f":3:{filepath}"], cwd=project_dir)
+
+                if ours_result.returncode != 0 or theirs_result.returncode != 0:
+                    continue
+
+                ours_lines = ours_result.stdout.split("\n")
+                theirs_lines = theirs_result.stdout.split("\n")
+
+                # Keep ours as base, add unique lines from theirs
+                ours_set = set(ours_lines)
+                merged_lines = list(ours_lines)
+                for line in theirs_lines:
+                    if line not in ours_set:
+                        merged_lines.append(line)
+
+                full_path.write_text("\n".join(merged_lines), encoding="utf-8")
+                run_git(["add", filepath], cwd=project_dir)
+                resolved_count += 1
+                print_status(f"Auto-resolved plaintext conflict: {filepath}", "success")
+
+        except Exception as e:
+            # Can't resolve — leave conflict as-is
+            print_status(f"Could not auto-resolve {filepath}: {e}", "warning")
+            continue
+
+    return resolved_count
+
+
+def _deep_merge_dicts(base: dict, override: dict) -> dict:
+    """Deep merge two dicts. Override wins on key conflicts."""
+    result = dict(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 def _try_smart_merge(
