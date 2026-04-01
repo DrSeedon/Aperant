@@ -464,26 +464,13 @@ updated by the orchestrator after each session. You don't need to update them ma
 
 ## STEP 10: UPDATE build-progress.txt
 
-**APPEND** to the end:
-
+Use the `append_progress` tool:
 ```
-SESSION N - [DATE]
-==================
-Subtask completed: [subtask-id] - [description]
-- Service: [service name]
-- Files modified: [list]
-- Verification: [type] - [result]
-
-Phase progress: [phase-name] [X]/[Y] subtasks
-
-Next subtask: [subtask-id] - [description]
-Next phase (if applicable): [phase-name]
-
-=== END SESSION N ===
+Tool: mcp__auto-claude__append_progress
+Input: { "subtask_id": "[subtask-id]", "summary": "What was done, files modified, verification result" }
 ```
 
-**Note:** The `build-progress.txt` file is in `.auto-claude/specs/` which is gitignored.
-Do NOT try to commit it - the framework tracks progress automatically.
+**DO NOT** read build-progress.txt first — the tool appends directly.
 
 ---
 

@@ -34,6 +34,7 @@ WEB_TOOLS = ["WebFetch", "WebSearch"]
 # Auto-Claude MCP tool names (prefixed with mcp__auto-claude__)
 TOOL_UPDATE_SUBTASK_STATUS = "mcp__auto-claude__update_subtask_status"
 TOOL_GET_BUILD_PROGRESS = "mcp__auto-claude__get_build_progress"
+TOOL_APPEND_PROGRESS = "mcp__auto-claude__append_progress"
 TOOL_RECORD_DISCOVERY = "mcp__auto-claude__record_discovery"
 TOOL_RECORD_GOTCHA = "mcp__auto-claude__record_gotcha"
 TOOL_GET_SESSION_CONTEXT = "mcp__auto-claude__get_session_context"
@@ -206,6 +207,7 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [
             TOOL_UPDATE_SUBTASK_STATUS,
             TOOL_GET_BUILD_PROGRESS,
+            TOOL_APPEND_PROGRESS,
             TOOL_RECORD_DISCOVERY,
             TOOL_RECORD_GOTCHA,
             TOOL_GET_SESSION_CONTEXT,

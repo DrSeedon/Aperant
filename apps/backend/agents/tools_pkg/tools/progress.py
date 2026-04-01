@@ -139,4 +139,46 @@ Next subtask to work on:
 
     tools.append(get_build_progress)
 
+    # -------------------------------------------------------------------------
+    # Tool: append_progress
+    # -------------------------------------------------------------------------
+    @tool(
+        "append_progress",
+        "Append a progress entry to build-progress.txt. Use after completing a subtask to record what was done. No need to read the file first.",
+        {"subtask_id": str, "summary": str},
+    )
+    async def append_progress(args: dict[str, Any]) -> dict[str, Any]:
+        """Append progress entry to build-progress.txt."""
+        subtask_id = args["subtask_id"]
+        summary = args.get("summary", "")
+
+        progress_file = spec_dir / "build-progress.txt"
+
+        try:
+            from datetime import datetime, timezone
+
+            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            entry = f"\n{subtask_id} — {timestamp}\n{summary}\n"
+
+            with open(progress_file, "a", encoding="utf-8") as f:
+                f.write(entry)
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Progress recorded for {subtask_id}",
+                    }
+                ]
+            }
+
+        except Exception as e:
+            return {
+                "content": [
+                    {"type": "text", "text": f"Error appending progress: {e}"}
+                ]
+            }
+
+    tools.append(append_progress)
+
     return tools
