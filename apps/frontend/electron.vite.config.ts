@@ -24,6 +24,15 @@ const sentryDefines = {
 export default defineConfig({
   main: {
     define: sentryDefines,
+    server: {
+      // Disable main process auto-restart on file changes
+      // Main process restarts kill Electron (window closes), losing user context
+      // Python backend picks up changes on next agent session anyway
+      // Renderer still gets HMR for frontend changes
+      watch: {
+        ignored: ['**/*']
+      }
+    },
     plugins: [externalizeDepsPlugin({
       // Bundle these packages into the main process (they won't be in node_modules in packaged app)
       exclude: [
