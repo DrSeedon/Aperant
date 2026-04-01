@@ -500,17 +500,47 @@ def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
             # Skip missing files gracefully
             pass
 
+    # Inject spec summary so QA agent doesn't need to Read spec.md
+    spec_summary = ""
+    spec_file = spec_dir / "spec.md"
+    if spec_file.exists():
+        try:
+            spec_text = spec_file.read_text(encoding="utf-8")
+            spec_summary = spec_text[:2000] + ("\n... (truncated)" if len(spec_text) > 2000 else "")
+        except Exception:
+            pass
+
+    # Inject progress summary
+    progress_summary = ""
+    try:
+        plan_file = spec_dir / "implementation_plan.json"
+        if plan_file.exists():
+            import json as _json
+            plan_data = _json.loads(plan_file.read_text(encoding="utf-8"))
+            completed = sum(
+                1 for p in plan_data.get("phases", [])
+                for s in p.get("subtasks", [])
+                if s.get("status") == "completed"
+            )
+            total = sum(
+                len(p.get("subtasks", []))
+                for p in plan_data.get("phases", [])
+            )
+            progress_summary = f"**Progress:** {completed}/{total} subtasks completed"
+    except Exception:
+        pass
+
     # Inject spec context at the beginning
     spec_context = f"""## SPEC LOCATION
 
-Your spec and progress files are located at:
-- Spec: `{spec_dir}/spec.md`
-- Implementation plan: `{spec_dir}/implementation_plan.json`
-- Progress notes: `{spec_dir}/build-progress.txt`
-- QA report output: `{spec_dir}/qa_report.md`
-- Fix request output: `{spec_dir}/QA_FIX_REQUEST.md`
-
 The project root is: `{project_dir}`
+{progress_summary}
+
+## Spec Summary (read-only — DO NOT Read spec.md manually)
+
+{spec_summary}
+
+---
 
 ## GIT BRANCH CONFIGURATION
 

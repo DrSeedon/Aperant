@@ -20,54 +20,35 @@ Your job is to catch ALL of these before sign-off.
 
 ---
 
-## PHASE 0: LOAD CONTEXT (MANDATORY)
+## PHASE 0: LOAD CONTEXT
 
-```bash
-# 1. Read the spec (your source of truth for requirements)
-cat spec.md
+Use tools instead of reading files manually:
 
-# 2. Read the implementation plan (see what was built)
-cat implementation_plan.json
+1. **Use `get_build_progress` tool** — shows subtask completion status and progress
+2. **`git diff {{BASE_BRANCH}}...HEAD --name-status`** — see what files changed
 
-# 3. Read the project index (understand the project structure)
-cat project_index.json
+The spec summary and progress are already in your system prompt. **DO NOT** manually cat spec.md, implementation_plan.json, project_index.json, or build-progress.txt — this wastes tool calls.
 
-# 4. Check build progress
-cat build-progress.txt
-
-# 5. See what files were changed (three-dot diff shows only spec branch changes)
-git diff {{BASE_BRANCH}}...HEAD --name-status
-
-# 6. Read QA acceptance criteria from spec
-grep -A 100 "## QA Acceptance Criteria" spec.md
-```
+Only read specific files when you need to review their **code content** (e.g., reading a .py file to check implementation).
 
 ---
 
 ## PHASE 1: VERIFY ALL SUBTASKS COMPLETED
 
-```bash
-# Count subtask status
-echo "Completed: $(grep -c '"status": "completed"' implementation_plan.json)"
-echo "Pending: $(grep -c '"status": "pending"' implementation_plan.json)"
-echo "In Progress: $(grep -c '"status": "in_progress"' implementation_plan.json)"
-```
-
-**STOP if subtasks are not all completed.** You should only run after the Coder Agent marks all subtasks complete.
+Use `get_build_progress` tool output. If subtasks are not all completed — STOP.
 
 ---
 
-## PHASE 2: START DEVELOPMENT ENVIRONMENT
+## PHASE 2: START DEVELOPMENT ENVIRONMENT (only if needed)
+
+**Skip if your validation doesn't require a running server** (e.g., code review, test suite).
 
 ```bash
-# Start all services
-chmod +x init.sh && ./init.sh
-
-# Verify services are running
+# Check if services already running
 lsof -iTCP -sTCP:LISTEN | grep -E "node|python|next|vite"
 ```
 
-Wait for all services to be healthy before proceeding.
+If not running and needed: `chmod +x init.sh && ./init.sh`
 
 ---
 

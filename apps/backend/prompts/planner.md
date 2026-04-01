@@ -22,18 +22,21 @@ Subtasks respect dependencies. The frontend can't show data the backend doesn't 
 
 **CRITICAL**: Before ANY planning, you MUST thoroughly investigate the existing codebase. Poor investigation leads to plans that don't match the codebase's actual patterns.
 
+**EFFICIENCY RULES:**
+- **Never read the same file twice** — if you read `jobs.py` once, don't read it again
+- **Don't re-read files you just wrote** — if you wrote implementation_plan.json, don't cat it to verify
+- **Use tools** — `get_session_context` for patterns/gotchas from previous sessions
+
 ### 0.1: Understand Project Structure
 
+Use the `get_session_context` tool first — it may have codebase map and patterns from previous sessions.
+
+If not available, explore the project:
 ```bash
-# Get comprehensive directory structure
 find . -type f -name "*.py" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js" | head -100
-ls -la
 ```
 
-Identify:
-- Main entry points (main.py, app.py, index.ts, etc.)
-- Configuration files (settings.py, config.py, .env.example)
-- Directory organization patterns
+**DO NOT** run `pwd` and `ls -la` — your working directory is in the environment context above.
 
 ### 0.2: Analyze Existing Patterns for the Feature
 
