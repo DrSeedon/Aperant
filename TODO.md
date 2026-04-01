@@ -1,5 +1,9 @@
 # TODO
 
+## Приоритет 1 — высокая отдача
+
+- [ ] **Shared project context** — общий `.auto-claude/project_context/` для всех задач проекта (project_index.json, architecture.md, patterns.md). Planner читает при старте вместо 20 tool calls на исследование. Писать только **после мержа** (post-merge hook), не во время задачи — worktree'ы видят одну версию. Первая задача создаёт, остальные переиспользуют. Экономит 15-25 tool calls на каждый новый planner.
+
 ## Приоритет 2 — средняя сложность
 
 - [ ] **Внешний MCP-сервер для управления Aperant** — Claude Code из другого сеанса создаёт задачи, запускает билды, проверяет статус. Референс: Aperant-MCP (15 инструментов). Портировать на Python (FastMCP). Ключ к full automation.
