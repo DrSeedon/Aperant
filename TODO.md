@@ -25,9 +25,11 @@
 
 - [ ] **Skill-файлы для Claude Code** — `.claude/skills/` с инструкциями как управлять задачами. Просто markdown, адаптировать под наш workflow.
 
-### Приоритет 3 — на потом
+### Приоритет 2 — средняя сложность (продолжение)
 
-- [ ] **Расширенный MCP-сервер** — у них 15 инструментов (create_task, start_batch, wait_for_review, recover_stuck). У нас базовый MCP есть, но нет batch-операций и recovery через MCP.
+- [ ] **Внешний MCP-сервер для управления Aperant** — чтобы Claude Code из другого сеанса мог создавать задачи, запускать билды, проверять статус, управлять несколькими проектами. Референс: Aperant-MCP (15 инструментов: create_task, start_batch, get_status, wait_for_review, recover_stuck). Портировать на Python (FastMCP). Это ключ к full automation: Master LLM → Aperant MCP → агенты работают.
+
+### Приоритет 3 — на потом
 
 - [ ] **Auto-Shutdown** — мониторит задачи, шатдаунит систему когда всё done. Полезно для overnight runs. Адаптировать под Linux.
 
