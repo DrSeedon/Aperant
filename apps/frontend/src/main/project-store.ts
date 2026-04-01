@@ -502,9 +502,10 @@ export class ProjectStore {
           const items = phase.subtasks || (phase as { chunks?: PlanSubtask[] }).chunks || [];
           return items.map((subtask) => ({
             id: subtask.id,
-            title: subtask.description,
+            title: subtask.title || subtask.description,
             description: subtask.description,
             status: subtask.status,
+            model: subtask.model,
             files: []
           }));
         }) || [];
