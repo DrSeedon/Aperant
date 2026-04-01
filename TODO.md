@@ -64,7 +64,7 @@
 
 **Как исправить:**
 - [ ] **Инжектить subtask context в системный промпт** — `prompts_pkg/prompt_generator.py` уже генерирует промпт для конкретного subtask'а. Расширить: добавить поля subtask'а (id, description, files_to_modify, files_to_create, patterns_from, verification) прямо в промпт. Агент стартует уже зная что делать.
-- [ ] **Убрать обязательные cat** из Step 1 — заменить на: "Если нужна дополнительная информация — используй get_build_progress и get_session_context тулзы". Файл: `prompts/coder.md` строки 130-205.
+- [x] **Убрать обязательные cat** из Step 1 — ✅ СДЕЛАНО. Step 1 переписан на tool calls (get_build_progress, get_session_context).
 - [ ] **spec.md — один раз** — инжектить summary из spec.md в системный промпт, убрать cat spec.md из Step 1.
 
 ### Проблема 2: Дублирующиеся Read — 98 calls потрачено (15%)
@@ -90,8 +90,8 @@
 
 **Как исправить:**
 - [ ] **complete_subtask() тулза** — объединяет: update_status(completed) + append build-progress.txt + git add+commit + return next subtask. ОДИН вызов вместо 5. Файл: `tools/subtask.py`
-- [ ] **Убрать Mandatory Pre-Command Check** (строки 111-126) — pwd перед каждым git это паранойя. Достаточно одного pwd при старте сессии. Файл: `prompts/coder.md`
-- [ ] **Убрать pwd из Step 6** (строки 468-477) — агент уже знает где он после Step 1. Файл: `prompts/coder.md`
+- [x] **Убрать Mandatory Pre-Command Check** — ✅ СДЕЛАНО. Заменён на 1-строчный совет.
+- [x] **Убрать pwd из Step 6** — ✅ СДЕЛАНО. Удалён mandatory pwd перед implement.
 
 ### Проблема 4: Server start loops — 49 calls потрачено (7.5%)
 
@@ -99,14 +99,14 @@
 
 **Как исправить:**
 - [ ] **Передавать venv_path и run_command в контексте** — `prompt_generator.py` уже знает project_index.json где есть dev_command и venv path. Инжектить в промпт: "Твой venv: ./.venv, запуск: uv run uvicorn ...". Файл: `prompts_pkg/prompt_generator.py`
-- [ ] **Step 4 — только для первого subtask'а** — если сервер уже запущен (порт занят), не перезапускать. Добавить проверку `lsof -i:PORT` перед запуском. Файл: `prompts/coder.md` строки 262-284.
+- [x] **Step 4 — проверять порт перед запуском** — ✅ СДЕЛАНО. Добавлен lsof check, skip если уже слушает.
 
 ### Проблема 5: Self-Critique overhead — 15+ calls потрачено
 
 **Что происходит:** Step 6.5 (строки 543-675) — MANDATORY Self-Critique Checklist с 25+ пунктами. Агент реально проходит каждый пункт, запускает echo-команды, перечитывает файлы для проверки. На тривиальном subtask'е (создать config.py) — это overkill.
 
 **Как исправить:**
-- [ ] **Привязать critique к сложности subtask'а** — тривиальные (1 файл, scaffold) → skip critique. Средние → краткий checklist (5 пунктов). Сложные → полный. Связать с полем `model` из Smart Model Selection. Файл: `prompts/coder.md` строки 543-675.
+- [x] **Привязать critique к сложности subtask'а** — ✅ СДЕЛАНО. Step 6.5 теперь: simple→skip, medium→quick check, complex→full review. Убран формальный отчёт.
 
 ### Проблема 6: Planner over-splitting — 6 subtask'ов на тривиальную задачу
 
@@ -135,23 +135,21 @@
 
 ### Сводка: потенциальная экономия + сложность внедрения
 
-| # | Фикс | Экономия | Сложность | Что менять | Время |
-|---|------|----------|-----------|-----------|-------|
-| 1 | Убрать pwd-ритуалы из промпта | ~45 calls | 🟢 Лёгкая | Удалить строки из `coder.md` | 10 мин |
-| 2 | Убрать обязательные cat из Step 1 | ~40 calls | 🟢 Лёгкая | Переписать Step 1 в `coder.md` | 15 мин |
-| 3 | Step 4 — проверять порт перед запуском | ~49 calls | 🟢 Лёгкая | Добавить `lsof` check в `coder.md` | 5 мин |
-| 4 | Critique по сложности | ~15 calls | 🟢 Лёгкая | Условие в `coder.md` Step 6.5 | 10 мин |
-| 5 | get_next_subtask() тулза | ~50 calls, ~20% ctx | 🟡 Средняя | Новая функция в `tools/subtask.py`, регистрация в `models.py` | 30 мин |
-| 6 | append_progress() тулза | ~23 calls | 🟢 Лёгкая | Новая функция в `tools/progress.py` | 15 мин |
-| 7 | run_verification() тулза | ~30 calls | 🟡 Средняя | Новая функция в `tools/subtask.py`, subprocess.run | 30 мин |
-| 8 | complete_subtask() тулза | ~87 calls, ~15% ctx | 🟡 Средняя | Комбо: update status + progress + git + next. `tools/subtask.py` | 45 мин |
-| 9 | Инжекция subtask в промпт | ~80 calls, ~30% ctx | 🟡 Средняя | `prompt_generator.py` — добавить subtask data в промпт | 30 мин |
-| 10 | venv/run_command в контексте | ~42 calls | 🟡 Средняя | `prompt_generator.py` — читать project_index, инжектить пути | 20 мин |
-| 11 | Planner smart splitting | ~100+ calls | 🔴 Сложная | `planner.md` — переписать Subtask Guidelines, complexity rules | 1-2 часа |
+| # | Фикс | Экономия | Сложность | Статус |
+|---|------|----------|-----------|--------|
+| 1 | Убрать pwd-ритуалы из промпта | ~45 calls | 🟢 | ✅ СДЕЛАНО |
+| 2 | Убрать обязательные cat из Step 1 | ~40 calls | 🟢 | ✅ СДЕЛАНО |
+| 3 | Step 4 — проверять порт перед запуском | ~49 calls | 🟢 | ✅ СДЕЛАНО |
+| 4 | Critique по сложности | ~15 calls | 🟢 | ✅ СДЕЛАНО |
+| 5 | get_next_subtask() тулза | ~50 calls, ~20% ctx | 🟡 | ⬜ |
+| 6 | append_progress() тулза | ~23 calls | 🟢 | ⬜ |
+| 7 | run_verification() тулза | ~30 calls | 🟡 | ⬜ |
+| 8 | complete_subtask() тулза | ~87 calls, ~15% ctx | 🟡 | ⬜ |
+| 9 | Инжекция subtask в промпт | ~80 calls, ~30% ctx | 🟡 | ⬜ |
+| 10 | venv/run_command в контексте | ~42 calls | 🟡 | ⬜ |
+| 11 | Planner smart splitting | ~100+ calls | 🔴 | ⬜ |
 
-**Рекомендуемый порядок:** сначала 🟢 (40 мин, чистка промптов), потом 🟡 тулзы (2.5 часа), потом 🔴 planner (1-2 часа).
-
-**ROI:** фиксы 1-4 (чистка промптов) = 40 мин работы → ~150 calls экономии на каждую задачу. Это самый жирный ROI.
+**Следующий шаг:** фиксы 6 (append_progress, 🟢, 15 мин) → 5 (get_next_subtask) → 8 (complete_subtask) → 9 (инжекция subtask).
 
 ## Smart Model Selection
 
@@ -159,7 +157,7 @@
 
 ## UI улучшения
 
-- [ ] **Группировка логов по subtask'ам** — сейчас 900+ записей в Coding фазе идут плоской лентой. Backend уже пишет `subtask_id` в каждую лог-запись (`TaskLogEntry.subtask_id`), но UI (`TaskLogs.tsx`) это поле игнорирует. Нужно: сгруппировать entries по subtask_id через `useMemo`, добавить collapsible `SubtaskLogGroup` между phase и entries, подтянуть название из `task.subtasks`. Только фронтенд, backend не трогать.
+- [x] **Группировка логов по subtask'ам** — ✅ СДЕЛАНО. `TaskLogs.tsx` группирует entries по subtask_id в collapsible секции с названием и count.
 
 ## Баги Aperant
 
