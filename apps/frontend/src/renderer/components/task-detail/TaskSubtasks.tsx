@@ -1,9 +1,15 @@
-import { CheckCircle2, Clock, XCircle, AlertCircle, ListChecks, FileCode } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, AlertCircle, ListChecks, FileCode, Cpu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '../ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { cn, calculateProgress } from '../../lib/utils';
 import type { Task } from '../../../shared/types';
+
+const MODEL_BADGE_STYLES: Record<string, string> = {
+  haiku: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
+  sonnet: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
+  opus: 'bg-purple-500/10 text-purple-500 border-purple-500/30',
+};
 
 interface TaskSubtasksProps {
   task: Task;
@@ -68,6 +74,15 @@ export function TaskSubtasks({ task }: TaskSubtasksProps) {
                     )}>
                       #{index + 1}
                     </span>
+                    {subtask.model && (
+                      <span className={cn(
+                        'text-[9px] font-medium px-1.5 py-0.5 rounded-full border shrink-0 mt-0.5 flex items-center gap-0.5',
+                        MODEL_BADGE_STYLES[subtask.model] || 'bg-muted text-muted-foreground border-border'
+                      )}>
+                        <Cpu className="h-2.5 w-2.5" />
+                        {subtask.model}
+                      </span>
+                    )}
                     <span className="text-sm font-medium text-foreground break-words flex-1 min-w-0">
                       {subtask.title || t('tasks:subtasks.untitled')}
                     </span>

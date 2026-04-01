@@ -377,6 +377,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
                 title,
                 description,
                 status,
+                model: subtask.model,
                 files: [],
                 verification: subtask.verification as Subtask['verification']
               };

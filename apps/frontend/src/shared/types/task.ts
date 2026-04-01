@@ -41,6 +41,7 @@ export interface Subtask {
   title: string;
   description: string;
   status: SubtaskStatus;
+  model?: string;
   files: string[];
   verification?: {
     type: 'command' | 'browser';
