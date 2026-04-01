@@ -472,6 +472,15 @@ def create_subtask_tools(spec_dir: Path, project_dir: Path) -> list:
                 if all(s.get("status") == "completed" for s in phase.get("subtasks", [])):
                     completed_phases.add(pid)
 
+            # Find current subtask's model for comparison
+            current_model = None
+            for phase in phases:
+                for s in phase.get("subtasks", []):
+                    if s.get("id") == subtask_id:
+                        current_model = s.get("model")
+                        break
+
+            # 4. Find next subtask
             next_info = "All subtasks completed. Build ready for QA."
             for phase in phases:
                 pid = phase.get("id", "")
@@ -481,15 +490,22 @@ def create_subtask_tools(spec_dir: Path, project_dir: Path) -> list:
                     continue
                 for s in phase.get("subtasks", []):
                     if s.get("status") in ("pending", "in_progress"):
-                        next_info = json.dumps({
-                            "id": s.get("id"),
-                            "description": s.get("description", ""),
-                            "phase": pname,
-                            "files_to_modify": s.get("files_to_modify", []),
-                            "files_to_create": s.get("files_to_create", []),
-                            "patterns_from": s.get("patterns_from", []),
-                            "verification": s.get("verification", {}),
-                        }, indent=2, ensure_ascii=False)
+                        next_model = s.get("model")
+                        # If next subtask needs a different model, don't return it
+                        # Let the orchestrator start a new session with the right model
+                        if current_model and next_model and next_model != current_model:
+                            next_info = f"Done. Next subtask ({s.get('id')}) requires model '{next_model}' (current: '{current_model}'). Session should end."
+                        else:
+                            next_info = json.dumps({
+                                "id": s.get("id"),
+                                "description": s.get("description", ""),
+                                "phase": pname,
+                                "model": next_model,
+                                "files_to_modify": s.get("files_to_modify", []),
+                                "files_to_create": s.get("files_to_create", []),
+                                "patterns_from": s.get("patterns_from", []),
+                                "verification": s.get("verification", {}),
+                            }, indent=2, ensure_ascii=False)
                         break
                 else:
                     continue
