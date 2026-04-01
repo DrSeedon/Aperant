@@ -323,8 +323,8 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
-  // Open DevTools in development
-  if (is.dev) {
+  // Open DevTools in development (unless NO_DEVTOOLS is set)
+  if (is.dev && !process.env.NO_DEVTOOLS) {
     mainWindow.webContents.openDevTools({ mode: 'right' });
   }
 

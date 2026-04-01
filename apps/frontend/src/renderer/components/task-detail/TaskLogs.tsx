@@ -25,6 +25,12 @@ import { useSettingsStore } from '../../stores/settings-store';
 import type { Task, TaskLogs, TaskLogPhase, TaskPhaseLog, TaskLogEntry, TaskMetadata } from '../../../shared/types';
 import type { PhaseModelConfig, ThinkingLevel, ModelTypeShort } from '../../../shared/types/settings';
 
+interface SubtaskLogGroup {
+  subtaskId: string;
+  label: string;
+  entries: TaskLogEntry[];
+}
+
 interface TaskLogsProps {
   task: Task;
   phaseLogs: TaskLogs | null;
@@ -120,6 +126,14 @@ export function TaskLogs({
   onLogsScroll,
   onTogglePhase
 }: TaskLogsProps) {
+  const subtaskNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const st of task.subtasks || []) {
+      map[st.id] = st.title || st.description || st.id;
+    }
+    return map;
+  }, [task.subtasks]);
+
   return (
     <div
       ref={logsContainerRef}
@@ -143,6 +157,7 @@ export function TaskLogs({
                 onToggle={() => onTogglePhase(phase)}
                 isTaskStuck={isStuck}
                 phaseConfig={getPhaseConfig(task.metadata, phase)}
+                subtaskNames={subtaskNames}
               />
             ))}
             <div ref={logsEndRef} />
@@ -173,16 +188,55 @@ interface PhaseLogSectionProps {
   onToggle: () => void;
   isTaskStuck?: boolean;
   phaseConfig?: { model: string; thinking: string } | null;
+  subtaskNames?: Record<string, string>;
 }
 
-function PhaseLogSection({ phase, phaseLog, isExpanded, onToggle, isTaskStuck, phaseConfig }: PhaseLogSectionProps) {
+function PhaseLogSection({ phase, phaseLog, isExpanded, onToggle, isTaskStuck, phaseConfig, subtaskNames }: PhaseLogSectionProps) {
   const Icon = PHASE_ICONS[phase];
   const logOrder = useSettingsStore(s => s.settings.logOrder);
   const status = phaseLog?.status || 'pending';
   const hasEntries = (phaseLog?.entries.length || 0) > 0;
+  const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
 
-  // Memoize sorted entries to avoid re-calculating on every render
-  // Entries are naturally in chronological order (oldest first from append())
+  const toggleSubtask = (id: string) => {
+    setExpandedSubtasks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Group entries by subtask_id, then apply sort order
+  const subtaskGroups = useMemo((): SubtaskLogGroup[] => {
+    const entries = phaseLog?.entries || [];
+    const groups: SubtaskLogGroup[] = [];
+    let currentGroup: SubtaskLogGroup | null = null;
+
+    for (const entry of entries) {
+      const sid = entry.subtask_id || '_ungrouped';
+      if (!currentGroup || currentGroup.subtaskId !== sid) {
+        currentGroup = {
+          subtaskId: sid,
+          label: sid === '_ungrouped' ? '' : (subtaskNames?.[sid] || sid),
+          entries: [],
+        };
+        groups.push(currentGroup);
+      }
+      currentGroup.entries.push(entry);
+    }
+
+    if (logOrder === 'reverse-chronological') {
+      groups.reverse();
+      for (const g of groups) g.entries.reverse();
+    }
+
+    return groups;
+  }, [phaseLog?.entries, logOrder, subtaskNames]);
+
+  const hasSubtaskGrouping = subtaskGroups.some(g => g.subtaskId !== '_ungrouped');
+
+  // Flat entries for phases without subtask grouping
   const displayedEntries = useMemo(() => {
     const entries = phaseLog?.entries || [];
     return logOrder === 'reverse-chronological' ? [...entries].reverse() : entries;
@@ -281,6 +335,41 @@ function PhaseLogSection({ phase, phaseLog, isExpanded, onToggle, isTaskStuck, p
         <div className="mt-1 ml-6 border-l-2 border-border pl-4 py-2 space-y-1">
           {!hasEntries ? (
             <p className="text-xs text-muted-foreground italic">No logs yet</p>
+          ) : hasSubtaskGrouping ? (
+            subtaskGroups.map((group) => {
+              if (group.subtaskId === '_ungrouped') {
+                return group.entries.map((entry) => (
+                  <LogEntry key={`${entry.timestamp}-${entry.type}-${entry.content}`} entry={entry} />
+                ));
+              }
+              const isSubExpanded = expandedSubtasks.has(group.subtaskId);
+              return (
+                <div key={group.subtaskId} className="border border-border/50 rounded-md overflow-hidden">
+                  <button
+                    onClick={() => toggleSubtask(group.subtaskId)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-secondary/50 transition-colors"
+                  >
+                    {isSubExpanded ? (
+                      <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                    )}
+                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">{group.subtaskId}</span>
+                    <span className="font-medium text-foreground truncate">{group.label}</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                      ({group.entries.length})
+                    </span>
+                  </button>
+                  {isSubExpanded && (
+                    <div className="border-t border-border/30 pl-4 py-1 space-y-1">
+                      {group.entries.map((entry) => (
+                        <LogEntry key={`${entry.timestamp}-${entry.type}-${entry.content}`} entry={entry} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
             displayedEntries.map((entry) => (
               <LogEntry key={`${entry.timestamp}-${entry.type}-${entry.content}`} entry={entry} />
