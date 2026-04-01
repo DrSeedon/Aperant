@@ -153,8 +153,8 @@
 | 6   | append_progress() тулза                | ~23 calls           | 🟢        | ✅ СДЕЛАНО |
 | 7   | run_verification() тулза               | ~30 calls           | 🟡        | ✅ СДЕЛАНО |
 | 8   | complete_subtask() тулза               | ~87 calls, ~15% ctx | 🟡        | ✅ СДЕЛАНО |
-| 9   | Инжекция subtask в промпт              | ~80 calls, ~30% ctx | 🟡        | ⬜         |
-| 10  | venv/run_command в контексте           | ~42 calls           | 🟡        | ⬜         |
+| 9   | Инжекция subtask в промпт              | ~80 calls, ~30% ctx | 🟡        | ✅ СДЕЛАНО |
+| 10  | venv/run_command в контексте           | ~42 calls           | 🟡        | ✅ СДЕЛАНО |
 | 11  | Planner smart splitting                | ~100+ calls         | 🔴        | ⬜         |
 
 
