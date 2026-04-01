@@ -18,9 +18,9 @@
 
 ## Промпт оптимизация
 
-- [ ] **qa_reviewer.md** — те же проблемы что были в coder.md: обязательные Read spec/plan/progress при старте, нет MCP tools. По аналогии с coder.md: убрать ручные Read'ы, направить на тулзы, critique по сложности.
-- [ ] **planner.md** — повторные Read одного файла (jobs.py ×5). Добавить правило: не читать один файл дважды.
-- [ ] **Bash tool_input не отображается в логах** — UI показывает "Running / Done" без команды. Нужно показывать что запускалось.
+- [x] **qa_reviewer.md** — ✅ СДЕЛАНО. Phase 0 на тулзах, spec.md injected, port check
+- [x] **planner.md** — ✅ СДЕЛАНО. Efficiency rules, no pwd/ls, use get_session_context
+- [x] **Bash tool_input в QA логах** — ✅ СДЕЛАНО. reviewer.py теперь показывает command
 
 ## UI баги
 
