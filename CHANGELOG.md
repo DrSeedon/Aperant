@@ -1,4 +1,4 @@
-## 2.7.7-fork.1 — Russian Fork (2026-04-01)
+## 2.7.7-fork.1 — Russian Fork + Agent DX Overhaul (2026-04-01)
 
 Based on v2.7.6 stable. Fork: [DrSeedon/Aperant](https://github.com/DrSeedon/Aperant)
 
@@ -7,29 +7,46 @@ Based on v2.7.6 stable. Fork: [DrSeedon/Aperant](https://github.com/DrSeedon/Ape
 - Dynamic agent language injection — agents respond in UI-selected language (Python prompt loader)
 - Cyrillic-safe JSON output — `ensure_ascii=False` in spec pipeline
 
-### Agent DX — 61% waste eliminated
+### Agent DX — 61% waste → ~15%
 - **4 new MCP tools**: `get_next_subtask`, `run_verification`, `complete_subtask`, `append_progress`
 - `complete_subtask()` replaces 5 manual calls (update plan + progress + git commit) with 1
 - `run_verification()` auto-runs subtask verification and compares expected output
 - `get_next_subtask()` returns full subtask data with dependency checking
-- Subtask + venv info injected into prompt — agent starts ready to code
-- `coder.md` slimmed from 33KB to 20KB — removed 11 mandatory cat commands, pwd rituals, 90-line Python checklist
+- `coder.md` slimmed from 33KB to 20KB — removed mandatory cat/pwd rituals, Python checklist
 - Self-critique scales to complexity: skip for trivial, full review for complex
 - Dev server: check port before starting instead of blind restart
 
+### Smart Model Selection
+- **Per-subtask model by Planner** — each subtask assigned haiku/sonnet/opus based on complexity
+- **Auto-escalation on failure** — haiku fails → retry on sonnet → retry on opus
+- **Model badge in UI** — color-coded (green/blue/purple) shown per subtask
+
+### Prompt Injection
+- Subtask data (files, patterns, verification) injected into system prompt
+- spec.md summary (2000 chars) injected — agent doesn't need to Read it
+- Progress (X/Y subtasks) shown in header
+- venv path and dev command from project_index.json
+
+### exitReason Tracking
+- Agent writes structured exit reason to implementation_plan.json on stop
+- Reasons: complete, rate_limit, concurrency_limit, max_iterations
+- UI shows specific reason instead of generic "Task Appears Stuck"
+
 ### Planner Optimization
-- Complexity-aware subtask splitting: trivial tasks → 1-2 subtasks (was 6)
-- Anti-patterns documented: no "create directory" or "create __init__" as separate subtasks
+- Complexity-aware subtask splitting: trivial → 1-2 subtasks (was 6)
+- Anti-patterns: no "create directory" or "create __init__" as separate subtasks
 
 ### UI Fixes
 - Subtask title/description deduplication
 - Log grouping by subtask_id (collapsible sections inside coding phase)
+- exitReason displayed in stuck task warning with details
+- Model badge per subtask (haiku green, sonnet blue, opus purple)
 - Page title: Auto Claude → Aperant
 - DevTools hidden via `NO_DEVTOOLS=1` env var
 
 ### Docs
-- ARCHITECTURE.md — project map for AI agents
-- TODO.md — prioritized roadmap with implementation difficulty
+- ARCHITECTURE.md — project map for AI agents (English)
+- TODO.md — prioritized roadmap
 - README.md — fork description with upstream comparison
 
 ---

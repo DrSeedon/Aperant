@@ -20,11 +20,16 @@ Based on **v2.7.6 stable** → version **2.7.7-fork.1**
 - **coder.md** slimmed 33KB → 20KB — removed ritual overhead
 - **Smart splitting** — planner creates 1-2 subtasks for trivial tasks (was 6)
 - **Auto-verification** — `run_verification()` runs test commands and compares output automatically
+- **Per-subtask model selection** — planner assigns haiku/sonnet/opus per subtask complexity
+- **Model auto-escalation** — haiku fails → sonnet → opus automatically
+- **Prompt injection** — spec.md, progress, venv path injected into prompt (0 startup Read's)
+- **exitReason tracking** — agent writes why it stopped, UI shows specific reason
 
-### UI Fixes
-- Subtask title/description deduplication
+### UI
+- Model badge per subtask (haiku 🟢 / sonnet 🔵 / opus 🟣)
+- exitReason in stuck task warning (not just "Task Appears Stuck")
 - Log grouping by subtask (collapsible sections)
-- Page title: Aperant
+- Subtask title/description deduplication
 - DevTools hidden in dev mode (`NO_DEVTOOLS=1`)
 
 ### Docs
