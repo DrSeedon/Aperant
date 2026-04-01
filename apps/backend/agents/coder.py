@@ -94,6 +94,49 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# EXIT REASON TRACKING
+# =============================================================================
+
+
+def _save_exit_reason(
+    spec_dir: Path,
+    reason: str,
+    subtask_id: str | None = None,
+    details: str | None = None,
+) -> None:
+    """
+    Save structured exit reason to implementation_plan.json.
+
+    This allows the UI and recovery system to understand WHY the agent stopped.
+
+    Args:
+        spec_dir: Spec directory containing implementation_plan.json
+        reason: Exit reason (complete, error, stuck, rate_limit, auth_failure, max_iterations, concurrency_limit)
+        subtask_id: ID of the subtask when exit occurred (if any)
+        details: Additional details about the exit
+    """
+    plan_file = spec_dir / "implementation_plan.json"
+    if not plan_file.exists():
+        return
+
+    try:
+        with open(plan_file, encoding="utf-8") as f:
+            plan = json.load(f)
+
+        plan["exitReason"] = {
+            "reason": reason,
+            "subtask_id": subtask_id,
+            "details": details,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        from core.file_utils import write_json_atomic
+        write_json_atomic(plan_file, plan, indent=2)
+    except Exception as e:
+        logger.warning(f"Failed to save exit reason: {e}")
+
+
+# =============================================================================
 # FILE VALIDATION UTILITIES
 # =============================================================================
 
@@ -484,6 +527,7 @@ async def run_autonomous_agent(
         if is_build_complete(spec_dir):
             print_build_complete_banner(spec_dir)
             status_manager.update(state=BuildState.COMPLETE)
+            _save_exit_reason(spec_dir, "complete")
             return
 
         # Start/continue coding phase in task logger
@@ -545,6 +589,7 @@ async def run_autonomous_agent(
         if max_iterations and iteration > max_iterations:
             print(f"\nReached max iterations ({max_iterations})")
             print("To continue, run the script again without --max-iterations")
+            _save_exit_reason(spec_dir, "max_iterations", subtask_id, f"Reached {max_iterations} iterations")
             break
 
         # Get the next subtask to work on (planner sessions shouldn't bind to a subtask)
@@ -897,6 +942,7 @@ async def run_autonomous_agent(
             # QA loop will emit COMPLETE after actual approval
             print_build_complete_banner(spec_dir)
             status_manager.update(state=BuildState.COMPLETE)
+            _save_exit_reason(spec_dir, "complete")
 
             # Reset error tracking on success
             _reset_concurrency_state()
@@ -991,6 +1037,7 @@ async def run_autonomous_agent(
                         )
                         print_status(f"Subtask {subtask_id} marked as STUCK", "error")
 
+                    _save_exit_reason(spec_dir, "concurrency_limit", subtask_id, f"{consecutive_concurrency_errors} consecutive concurrency errors")
                     status_manager.update(state=BuildState.ERROR)
                     break  # Exit the loop
 
@@ -1070,6 +1117,7 @@ async def run_autonomous_agent(
                             ExecutionPhase.FAILED,
                             "Rate limit wait time exceeds maximum allowed",
                         )
+                        _save_exit_reason(spec_dir, "rate_limit", subtask_id, f"Wait {wait_seconds/3600:.1f}h exceeds max {MAX_RATE_LIMIT_WAIT_SECONDS/3600:.1f}h")
                         status_manager.update(state=BuildState.ERROR)
                         break
 
