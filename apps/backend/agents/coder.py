@@ -629,7 +629,21 @@ async def run_autonomous_agent(
         # first_run means we're in planning phase, otherwise coding phase
         current_phase = "planning" if first_run else "coding"
         # Per-subtask model override: planner assigns model per subtask (haiku/sonnet/opus)
+        # Model upgrade on failure: if subtask failed before, escalate to stronger model
         subtask_model_override = next_subtask.get("model") if next_subtask else None
+        if subtask_model_override and subtask_id:
+            attempt_count = recovery_manager.get_attempt_count(subtask_id)
+            if attempt_count > 0:
+                model_escalation = {"haiku": "sonnet", "sonnet": "opus"}
+                escalated = subtask_model_override
+                for _ in range(min(attempt_count, 2)):
+                    escalated = model_escalation.get(escalated, escalated)
+                if escalated != subtask_model_override:
+                    print_status(
+                        f"Model upgrade: {subtask_model_override} → {escalated} (attempt {attempt_count + 1})",
+                        "warning",
+                    )
+                    subtask_model_override = escalated
         phase_model = subtask_model_override or get_phase_model(spec_dir, current_phase, model)
         phase_betas = get_phase_model_betas(spec_dir, current_phase, model)
         thinking_kwargs = get_phase_client_thinking_kwargs(
