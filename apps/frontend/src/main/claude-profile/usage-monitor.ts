@@ -206,6 +206,10 @@ export class UsageMonitor extends EventEmitter {
   private currentUsageProfileId: string | null = null; // Track which profile's usage is in currentUsage
   private isChecking = false;
 
+  // Global 429 backoff — skip all usage checks when rate limited
+  private rateLimitBackoffUntil: number = 0;
+  private static RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000; // 5 minutes
+
   // Per-profile API failure tracking with cooldown-based retry
   // Map<profileId, lastFailureTimestamp> - stores when API last failed for this profile
   private apiFailureTimestamps: Map<string, number> = new Map();
@@ -881,6 +885,11 @@ export class UsageMonitor extends EventEmitter {
       return; // Prevent concurrent checks
     }
 
+    // Skip if rate limited — backoff for 5 minutes after 429
+    if (Date.now() < this.rateLimitBackoffUntil) {
+      return;
+    }
+
     this.isChecking = true;
     let profileId: string | undefined;
     let isAPIProfile = false;
@@ -1437,6 +1446,14 @@ export class UsageMonitor extends EventEmitter {
           provider,
           endpoint: usageEndpoint
         });
+
+        // 429 Rate Limited — backoff globally for 5 minutes
+        if (response.status === 429) {
+          this.rateLimitBackoffUntil = Date.now() + UsageMonitor.RATE_LIMIT_BACKOFF_MS;
+          console.warn('[UsageMonitor] Rate limited (429) — backing off for 5 minutes');
+          this.apiFailureTimestamps.set(profileId, Date.now());
+          return null;
+        }
 
         // Check for auth failures via status code (works for all providers)
         if (response.status === 401 || response.status === 403) {
