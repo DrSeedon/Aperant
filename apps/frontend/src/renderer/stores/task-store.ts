@@ -402,6 +402,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             ...t,
             title: plan.feature || t.title,
             subtasks,
+            exitReason: (plan as any).exitReason || t.exitReason,
             // Keep existing status and reviewReason - XState manages these via TASK_STATUS_CHANGE
             updatedAt: new Date()
           };

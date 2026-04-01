@@ -1,11 +1,19 @@
 import { AlertTriangle, Play, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 
+const EXIT_REASON_LABELS: Record<string, { label: string; description: string }> = {
+  complete: { label: 'Completed', description: 'All subtasks finished successfully.' },
+  rate_limit: { label: 'Rate Limited', description: 'API rate limit exceeded. Wait and restart.' },
+  concurrency_limit: { label: 'Concurrency Error', description: 'Agent hit tool concurrency limit repeatedly.' },
+  max_iterations: { label: 'Max Iterations', description: 'Reached iteration limit. Restart to continue.' },
+};
+
 interface TaskWarningsProps {
   isStuck: boolean;
   isIncomplete: boolean;
   isRecovering: boolean;
   taskProgress: { completed: number; total: number };
+  exitReason?: { reason: string; subtask_id?: string; details?: string; timestamp?: string };
   onRecover: () => void;
   onResume: () => void;
 }
@@ -15,10 +23,13 @@ export function TaskWarnings({
   isIncomplete,
   isRecovering,
   taskProgress,
+  exitReason,
   onRecover,
   onResume
 }: TaskWarningsProps) {
   if (!isStuck && !isIncomplete) return null;
+
+  const reasonInfo = exitReason ? EXIT_REASON_LABELS[exitReason.reason] : null;
 
   return (
     <>
@@ -29,11 +40,20 @@ export function TaskWarnings({
             <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
             <div className="flex-1">
               <h3 className="font-medium text-sm text-foreground mb-1">
-                Task Appears Stuck
+                {reasonInfo ? `Agent Stopped: ${reasonInfo.label}` : 'Task Appears Stuck'}
               </h3>
               <p className="text-sm text-muted-foreground mb-3">
-                This task is marked as running but no active process was found.
-                This can happen if the app crashed or the process was terminated unexpectedly.
+                {reasonInfo ? reasonInfo.description : 'This task is marked as running but no active process was found. This can happen if the app crashed or the process was terminated unexpectedly.'}
+                {exitReason?.subtask_id && (
+                  <span className="block mt-1 text-xs font-mono text-muted-foreground/70">
+                    Last subtask: {exitReason.subtask_id}
+                  </span>
+                )}
+                {exitReason?.details && (
+                  <span className="block mt-0.5 text-xs text-muted-foreground/70">
+                    {exitReason.details}
+                  </span>
+                )}
               </p>
               <Button
                 variant="warning"
