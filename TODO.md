@@ -161,6 +161,12 @@
 
 - [ ] **Группировка логов по subtask'ам** — сейчас 900+ записей в Coding фазе идут плоской лентой. Backend уже пишет `subtask_id` в каждую лог-запись (`TaskLogEntry.subtask_id`), но UI (`TaskLogs.tsx`) это поле игнорирует. Нужно: сгруппировать entries по subtask_id через `useMemo`, добавить collapsible `SubtaskLogGroup` между phase и entries, подтянуть название из `task.subtasks`. Только фронтенд, backend не трогать.
 
+## Баги Aperant
+
+- [ ] **AI merge resolver не разруливает конфликты в plaintext файлах** — `apps/backend/merge/ai_resolver/` падает на `.gitignore` конфликтах. Ожидает код (Python/TS), получает plaintext с `<<<<<<< HEAD` маркерами. Кнопка "Слить с AI" крутится и возвращает ту же ошибку. Файлы: `apps/backend/merge/ai_resolver/`. Фикс: добавить обработку plaintext — для простых файлов (.gitignore, .env, .md) просто объединять обе стороны без AI анализа.
+
+- [ ] **Кнопка "Слить с AI" активна при uncommitted changes** — UI показывает "Commit or stash them before staging" но кнопка не заблокирована. Пользователь жмёт → мерж падает → непонятно почему. Фикс: disable кнопку пока `git status` показывает uncommitted changes.
+
 ## Другие идеи
 
 - [ ] Посмотреть kanban reconciliation fix из **Sallvainian/BMAD-Studio** — auto-heal stuck задач
