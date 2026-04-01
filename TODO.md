@@ -2,7 +2,7 @@
 
 ## Приоритет 1 — высокая отдача
 
-- [ ] **Shared project context** — общий `.auto-claude/project_context/` для всех задач проекта (project_index.json, architecture.md, patterns.md). Planner читает при старте вместо 20 tool calls на исследование. Писать только **после мержа** (post-merge hook), не во время задачи — worktree'ы видят одну версию. Первая задача создаёт, остальные переиспользуют. Экономит 15-25 tool calls на каждый новый planner.
+- [x] **Shared project context** — ✅ СДЕЛАНО. `.auto-claude/project_index.json` shared. Planner проверяет shared → пропускает exploration. Post-merge update в workspace.py. prompt_generator fallback shared → per-spec.
 
 ## Приоритет 2 — средняя сложность
 
