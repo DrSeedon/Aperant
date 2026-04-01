@@ -238,8 +238,15 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                                 if len(fp) > 50:
                                     fp = "..." + fp[-47:]
                                 tool_input_display = fp
+                            elif "command" in inp:
+                                cmd = inp["command"]
+                                if len(cmd) > 80:
+                                    cmd = cmd[:77] + "..."
+                                tool_input_display = cmd
                             elif "pattern" in inp:
                                 tool_input_display = f"pattern: {inp['pattern']}"
+                            elif "path" in inp:
+                                tool_input_display = inp["path"]
 
                         debug(
                             "qa_reviewer",
