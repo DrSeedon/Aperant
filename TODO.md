@@ -3,7 +3,8 @@
 ## Приоритет 1 — высокая отдача
 
 - [x] **exitReason tracking** — ✅ СДЕЛАНО
-- [ ] **Per-subtask model selection by Planner** — Planner выбирает модель для каждого subtask'а: haiku для scaffold, sonnet для CRUD, opus для архитектуры. Поле `model` в subtask schema. Файлы: `planner.md`, `coder.py`, `task.ts`.
+- [x] **Per-subtask model selection by Planner** — ✅ СДЕЛАНО. haiku/sonnet/opus per subtask.
+- [ ] **Model upgrade on failure** — если subtask зафейлился на haiku, перезапустить на sonnet. Если sonnet зафейлился — на opus. Автоэскалация модели. Файл: `coder.py` в секции recovery/retry.
 
 ## Приоритет 2 — средняя сложность
 
