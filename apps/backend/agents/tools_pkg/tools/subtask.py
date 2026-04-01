@@ -201,4 +201,90 @@ def create_subtask_tools(spec_dir: Path, project_dir: Path) -> list:
 
     tools.append(update_subtask_status)
 
+    # -------------------------------------------------------------------------
+    # Tool: get_next_subtask
+    # -------------------------------------------------------------------------
+    @tool(
+        "get_next_subtask",
+        "Get full details of the next pending subtask: id, description, files_to_modify, files_to_create, patterns_from, verification, phase name. Use this instead of reading implementation_plan.json manually.",
+        {},
+    )
+    async def get_next_subtask(args: dict[str, Any]) -> dict[str, Any]:
+        """Get next pending subtask with all details."""
+        plan_file = spec_dir / "implementation_plan.json"
+
+        if not plan_file.exists():
+            return {
+                "content": [
+                    {"type": "text", "text": "Error: implementation_plan.json not found"}
+                ]
+            }
+
+        try:
+            with open(plan_file, encoding="utf-8") as f:
+                plan = json.load(f)
+
+            phases = plan.get("phases", [])
+
+            # Build set of completed phase IDs
+            completed_phases = set()
+            for phase in phases:
+                phase_id = phase.get("id", "")
+                all_done = all(
+                    s.get("status") == "completed"
+                    for s in phase.get("subtasks", [])
+                )
+                if all_done and phase.get("subtasks"):
+                    completed_phases.add(phase_id)
+
+            # Find next pending subtask respecting dependencies
+            for phase in phases:
+                phase_id = phase.get("id", "")
+                phase_name = phase.get("name", phase_id)
+                depends_on = phase.get("depends_on", [])
+
+                # Check if dependencies are met
+                deps_met = all(
+                    dep in completed_phases
+                    for dep in depends_on
+                )
+                if not deps_met:
+                    continue
+
+                for subtask in phase.get("subtasks", []):
+                    if subtask.get("status") in ("pending", "in_progress"):
+                        result = {
+                            "id": subtask.get("id", ""),
+                            "description": subtask.get("description", ""),
+                            "phase": phase_name,
+                            "phase_id": phase_id,
+                            "service": subtask.get("service", ""),
+                            "files_to_modify": subtask.get("files_to_modify", []),
+                            "files_to_create": subtask.get("files_to_create", []),
+                            "patterns_from": subtask.get("patterns_from", []),
+                            "verification": subtask.get("verification", {}),
+                        }
+                        return {
+                            "content": [
+                                {"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=False)}
+                            ]
+                        }
+
+            # All done
+            total = sum(len(p.get("subtasks", [])) for p in phases)
+            return {
+                "content": [
+                    {"type": "text", "text": f"All {total} subtasks completed. Build ready for QA."}
+                ]
+            }
+
+        except Exception as e:
+            return {
+                "content": [
+                    {"type": "text", "text": f"Error reading plan: {e}"}
+                ]
+            }
+
+    tools.append(get_next_subtask)
+
     return tools

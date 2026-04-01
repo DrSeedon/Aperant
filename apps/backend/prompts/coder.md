@@ -164,18 +164,14 @@ Phase 4: Integration [depends_on: ["phase-2", "phase-3"]] → Blocked until both
 
 ## STEP 3: FIND YOUR NEXT SUBTASK
 
-Scan `implementation_plan.json` in order:
-
-1. **Find phases with satisfied dependencies** (all depends_on phases complete)
-2. **Within those phases**, find the first subtask with `"status": "pending"`
-3. **That's your subtask**
-
-```bash
-# Quick check: which phases can I work on?
-# Look at depends_on and check if those phases' subtasks are all completed
+Use the `get_next_subtask` tool:
+```
+Tool: mcp__auto-claude__get_next_subtask
 ```
 
-**If all subtasks are completed**: The build is done!
+It returns: id, description, phase, files_to_modify, files_to_create, patterns_from, verification. Dependencies are checked automatically.
+
+**DO NOT** read implementation_plan.json manually to find your subtask — the tool does it for you.
 
 ---
 
