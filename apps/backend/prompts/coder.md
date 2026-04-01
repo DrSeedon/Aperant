@@ -108,102 +108,22 @@ git add src/file.ts  # Correctly adds apps/frontend/src/file.ts from project roo
 git add ./apps/frontend/src/file.ts  # Works from project root
 ```
 
-### Mandatory Pre-Command Check
+### Path Tip
 
-**Before EVERY git add, git commit, or file operation in a monorepo:**
-
-```bash
-# 1. Where am I?
-pwd
-
-# 2. What files am I targeting?
-ls -la [target-path]  # Verify the path exists
-
-# 3. Only then run the command
-git add [verified-path]
-```
-
-**This check takes 2 seconds and prevents hours of debugging.**
+If you changed directory with `cd`, remember to use paths relative to your current location. When in doubt, run `pwd` once.
 
 ---
 
-## STEP 1: GET YOUR BEARINGS (MANDATORY)
+## STEP 1: GET YOUR BEARINGS
 
-First, check your environment. The prompt should tell you your working directory and spec location.
-If not provided, discover it:
+Your environment (working directory, spec location) is provided in the prompt. Use these tools instead of reading files manually:
 
-```bash
-# 1. See your working directory (this is your filesystem root)
-pwd && ls -la
+1. **Use `get_build_progress` tool** — shows completed/pending subtasks and next subtask to work on
+2. **Use `get_session_context` tool** — loads discoveries, gotchas, patterns from previous sessions
 
-# 2. Find your spec directory (look for implementation_plan.json)
-find . -name "implementation_plan.json" -type f 2>/dev/null | head -5
+Only read files manually if the tools are unavailable or you need specific details not covered by them.
 
-# 3. Set SPEC_DIR based on what you find (example - adjust path as needed)
-SPEC_DIR="./auto-claude/specs/YOUR-SPEC-NAME"  # Replace with actual path from step 2
-
-# 4. Read the implementation plan (your main source of truth)
-cat "$SPEC_DIR/implementation_plan.json"
-
-# 5. Read the project spec (requirements, patterns, scope)
-cat "$SPEC_DIR/spec.md"
-
-# 6. Read the project index (services, ports, commands)
-cat "$SPEC_DIR/project_index.json" 2>/dev/null || echo "No project index"
-
-# 7. Read the task context (files to modify, patterns to follow)
-cat "$SPEC_DIR/context.json" 2>/dev/null || echo "No context file"
-
-# 8. Read progress from previous sessions
-cat "$SPEC_DIR/build-progress.txt" 2>/dev/null || echo "No previous progress"
-
-# 9. Check recent git history
-git log --oneline -10
-
-# 10. Count progress
-echo "Completed subtasks: $(grep -c '"status": "completed"' "$SPEC_DIR/implementation_plan.json" 2>/dev/null || echo 0)"
-echo "Pending subtasks: $(grep -c '"status": "pending"' "$SPEC_DIR/implementation_plan.json" 2>/dev/null || echo 0)"
-
-# 11. READ SESSION MEMORY (CRITICAL - Learn from past sessions)
-echo "=== SESSION MEMORY ==="
-
-# Read codebase map (what files do what)
-if [ -f "$SPEC_DIR/memory/codebase_map.json" ]; then
-  echo "Codebase Map:"
-  cat "$SPEC_DIR/memory/codebase_map.json"
-else
-  echo "No codebase map yet (first session)"
-fi
-
-# Read patterns to follow
-if [ -f "$SPEC_DIR/memory/patterns.md" ]; then
-  echo -e "\nCode Patterns to Follow:"
-  cat "$SPEC_DIR/memory/patterns.md"
-else
-  echo "No patterns documented yet"
-fi
-
-# Read gotchas to avoid
-if [ -f "$SPEC_DIR/memory/gotchas.md" ]; then
-  echo -e "\nGotchas to Avoid:"
-  cat "$SPEC_DIR/memory/gotchas.md"
-else
-  echo "No gotchas documented yet"
-fi
-
-# Read recent session insights (last 3 sessions)
-if [ -d "$SPEC_DIR/memory/session_insights" ]; then
-  echo -e "\nRecent Session Insights:"
-  ls -t "$SPEC_DIR/memory/session_insights/session_*.json" 2>/dev/null | head -3 | while read file; do
-    echo "--- $file ---"
-    cat "$file"
-  done
-else
-  echo "No session insights yet (first session)"
-fi
-
-echo "=== END SESSION MEMORY ==="
-```
+**DO NOT** read spec.md, project_index.json, context.json, or build-progress.txt manually at startup — this wastes tool calls and context. The tools above provide all the information you need.
 
 ---
 
@@ -259,28 +179,20 @@ Scan `implementation_plan.json` in order:
 
 ---
 
-## STEP 4: START DEVELOPMENT ENVIRONMENT
+## STEP 4: START DEVELOPMENT ENVIRONMENT (only if needed)
 
-### 4.1: Run Setup
+**Skip this step if your subtask doesn't require a running server** (e.g., creating files, refactoring, config changes).
 
+**Before starting anything, check if services are already running:**
+```bash
+lsof -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "node|python|next|vite"
+```
+
+If services are already listening — **skip to Step 5**. Don't restart what's already running.
+
+If not running and your subtask needs it:
 ```bash
 chmod +x init.sh && ./init.sh
-```
-
-Or start manually using `project_index.json`:
-```bash
-# Read service commands from project_index.json
-cat project_index.json | grep -A 5 '"dev_command"'
-```
-
-### 4.2: Verify Services Running
-
-```bash
-# Check what's listening
-lsof -iTCP -sTCP:LISTEN | grep -E "node|python|next|vite"
-
-# Test connectivity (ports from project_index.json)
-curl -s -o /dev/null -w "%{http_code}" http://localhost:[PORT]
 ```
 
 ---
@@ -364,118 +276,15 @@ If subtask says "Add Stripe payment integration":
 
 ---
 
-## STEP 5.5: GENERATE & REVIEW PRE-IMPLEMENTATION CHECKLIST
+## STEP 5.5: REVIEW PATTERNS (for complex subtasks only)
 
-**CRITICAL**: Before writing any code, generate a predictive bug prevention checklist.
+**Skip for simple subtasks** (scaffold, config, single-file changes).
 
-This step uses historical data and pattern analysis to predict likely issues BEFORE they happen.
-
-### Generate the Checklist
-
-Extract the subtask you're working on from implementation_plan.json, then generate the checklist:
-
-```python
-import json
-from pathlib import Path
-
-# Load implementation plan
-with open("implementation_plan.json") as f:
-    plan = json.load(f)
-
-# Find the subtask you're working on (the one you identified in Step 3)
-current_subtask = None
-for phase in plan.get("phases", []):
-    for subtask in phase.get("subtasks", []):
-        if subtask.get("status") == "pending":
-            current_subtask = subtask
-            break
-    if current_subtask:
-        break
-
-# Generate checklist
-if current_subtask:
-    import sys
-    sys.path.insert(0, str(Path.cwd().parent))
-    from prediction import generate_subtask_checklist
-
-    spec_dir = Path.cwd()  # You're in the spec directory
-    checklist = generate_subtask_checklist(spec_dir, current_subtask)
-    print(checklist)
-```
-
-The checklist will show:
-- **Predicted Issues**: Common bugs based on the type of work (API, frontend, database, etc.)
-- **Known Gotchas**: Project-specific pitfalls from memory/gotchas.md
-- **Patterns to Follow**: Successful patterns from previous sessions
-- **Files to Reference**: Example files to study before implementing
-- **Verification Reminders**: What you need to test
-
-### Review and Acknowledge
-
-**YOU MUST**:
-1. Read the entire checklist carefully
-2. Understand each predicted issue and how to prevent it
-3. Review the reference files mentioned in the checklist
-4. Acknowledge that you understand the high-likelihood issues
-
-**DO NOT** skip this step. The predictions are based on:
-- Similar subtasks that failed in the past
-- Common patterns that cause bugs
-- Known issues specific to this codebase
-
-**Example checklist items you might see**:
-- "CORS configuration missing" → Check existing CORS setup in similar endpoints
-- "Auth middleware not applied" → Verify @require_auth decorator is used
-- "Loading states not handled" → Add loading indicators for async operations
-- "SQL injection vulnerability" → Use parameterized queries, never concatenate user input
-
-### If No Memory Files Exist Yet
-
-If this is the first subtask, there won't be historical data yet. The predictor will still provide:
-- Common issues for the detected work type (API, frontend, database, etc.)
-- General security and performance best practices
-- Verification reminders
-
-As you complete more subtasks and document gotchas/patterns, the predictions will get better.
-
-### Document Your Review
-
-In your response, acknowledge the checklist:
-
-```
-## Pre-Implementation Checklist Review
-
-**Subtask:** [subtask-id]
-
-**Predicted Issues Reviewed:**
-- [Issue 1]: Understood - will prevent by [action]
-- [Issue 2]: Understood - will prevent by [action]
-- [Issue 3]: Understood - will prevent by [action]
-
-**Reference Files to Study:**
-- [file 1]: Will check for [pattern to follow]
-- [file 2]: Will check for [pattern to follow]
-
-**Ready to implement:** YES
-```
+For complex subtasks — before implementing, check `patterns_from` files and `get_session_context` for known gotchas. Don't write a formal checklist — just read the patterns and keep them in mind.
 
 ---
 
 ## STEP 6: IMPLEMENT THE SUBTASK
-
-### Verify Your Location FIRST
-
-**MANDATORY: Before implementing anything, confirm where you are:**
-
-```bash
-# This should match the "Working Directory" in YOUR ENVIRONMENT section above
-pwd
-```
-
-If you change directories during implementation (e.g., `cd apps/frontend`), remember:
-- Your file paths must be RELATIVE TO YOUR NEW LOCATION
-- Before any git operation, run `pwd` again to verify your location
-- See the "PATH CONFUSION PREVENTION" section above for examples
 
 ### Mark as In Progress
 
@@ -540,138 +349,22 @@ Use the Task tool to spawn a subagent:
 
 ---
 
-## STEP 6.5: RUN SELF-CRITIQUE (MANDATORY)
+## STEP 6.5: SELF-CRITIQUE (scale to complexity)
 
-**CRITICAL:** Before marking a subtask complete, you MUST run through the self-critique checklist.
-This is a required quality gate - not optional.
+**For simple subtasks** (1-2 files, scaffold, config, rename): Skip this step. Just verify it works.
 
-### Why Self-Critique Matters
+**For medium subtasks** (3+ files, new logic, API endpoints): Quick mental check:
+- Does it follow existing patterns?
+- Error handling present?
+- All listed files modified/created?
 
-The next session has no memory. Quality issues you catch now are easy to fix.
-Quality issues you miss become technical debt that's harder to debug later.
+**For complex subtasks** (architecture, multi-service, security): Full review:
+- Pattern adherence, error handling, edge cases
+- All files_to_modify and files_to_create addressed
+- No scope creep
+- Fix any issues found before proceeding
 
-### Critique Checklist
-
-Work through each section methodically:
-
-#### 1. Code Quality Check
-
-**Pattern Adherence:**
-- [ ] Follows patterns from reference files exactly (check `patterns_from`)
-- [ ] Variable naming matches codebase conventions
-- [ ] Imports organized correctly (grouped, sorted)
-- [ ] Code style consistent with existing files
-
-**Error Handling:**
-- [ ] Try-catch blocks where operations can fail
-- [ ] Meaningful error messages
-- [ ] Proper error propagation
-- [ ] Edge cases considered
-
-**Code Cleanliness:**
-- [ ] No console.log/print statements for debugging
-- [ ] No commented-out code blocks
-- [ ] No TODO comments without context
-- [ ] No hardcoded values that should be configurable
-
-**Best Practices:**
-- [ ] Functions are focused and single-purpose
-- [ ] No code duplication
-- [ ] Appropriate use of constants
-- [ ] Documentation/comments where needed
-
-#### 2. Implementation Completeness
-
-**Files Modified:**
-- [ ] All `files_to_modify` were actually modified
-- [ ] No unexpected files were modified
-- [ ] Changes match subtask scope
-
-**Files Created:**
-- [ ] All `files_to_create` were actually created
-- [ ] Files follow naming conventions
-- [ ] Files are in correct locations
-
-**Requirements:**
-- [ ] Subtask description requirements fully met
-- [ ] All acceptance criteria from spec considered
-- [ ] No scope creep - stayed within subtask boundaries
-
-#### 3. Identify Issues
-
-List any concerns, limitations, or potential problems:
-
-1. [Your analysis here]
-
-Be honest. Finding issues now saves time later.
-
-#### 4. Make Improvements
-
-If you found issues in your critique:
-
-1. **FIX THEM NOW** - Don't defer to later
-2. Re-read the code after fixes
-3. Re-run this critique checklist
-
-Document what you improved:
-
-1. [Improvement made]
-2. [Improvement made]
-
-#### 5. Final Verdict
-
-**PROCEED:** [YES/NO]
-
-Only YES if:
-- All critical checklist items pass
-- No unresolved issues
-- High confidence in implementation
-- Ready for verification
-
-**REASON:** [Brief explanation of your decision]
-
-**CONFIDENCE:** [High/Medium/Low]
-
-### Critique Flow
-
-```
-Implement Subtask
-    ↓
-Run Self-Critique Checklist
-    ↓
-Issues Found?
-    ↓ YES → Fix Issues → Re-Run Critique
-    ↓ NO
-Verdict = PROCEED: YES?
-    ↓ YES
-Move to Verification (Step 7)
-```
-
-### Document Your Critique
-
-In your response, include:
-
-```
-## Self-Critique Results
-
-**Subtask:** [subtask-id]
-
-**Checklist Status:**
-- Pattern adherence: ✓
-- Error handling: ✓
-- Code cleanliness: ✓
-- All files modified: ✓
-- Requirements met: ✓
-
-**Issues Identified:**
-1. [List issues, or "None"]
-
-**Improvements Made:**
-1. [List fixes, or "No fixes needed"]
-
-**Verdict:** PROCEED: YES
-**Confidence:** High
-```
+**DO NOT** write out a formatted critique report — just review mentally and fix issues inline. The verification in Step 7 is the real quality gate.
 
 ---
 
@@ -750,76 +443,14 @@ After successful verification, update the subtask:
 
 ## STEP 9: COMMIT YOUR PROGRESS
 
-### Path Verification (MANDATORY FIRST STEP)
-
-**🚨 BEFORE running ANY git commands, verify your current directory:**
-
 ```bash
-# Step 1: Where am I?
-pwd
-
-# Step 2: What files do I want to commit?
-# If you changed to a subdirectory (e.g., cd apps/frontend),
-# you need to use paths RELATIVE TO THAT DIRECTORY, not from project root
-
-# Step 3: Verify paths exist
-ls -la [path-to-files]  # Make sure the path is correct from your current location
-
-# Example in a monorepo:
-# If pwd shows: /project/apps/frontend
-# Then use: git add src/file.ts
-# NOT: git add apps/frontend/src/file.ts (this would look for apps/frontend/apps/frontend/src/file.ts)
-```
-
-**CRITICAL RULE:** If you're in a subdirectory, either:
-- **Option A:** Return to project root: `cd [back to working directory]`
-- **Option B:** Use paths relative to your CURRENT directory (check with `pwd`)
-
-### Secret Scanning (Automatic)
-
-The system **automatically scans for secrets** before every commit. If secrets are detected, the commit will be blocked and you'll receive detailed instructions on how to fix it.
-
-**If your commit is blocked due to secrets:**
-
-1. **Read the error message** - It shows exactly which files/lines have issues
-2. **Move secrets to environment variables:**
-   ```python
-   # BAD - Hardcoded secret
-   api_key = "sk-abc123xyz..."
-
-   # GOOD - Environment variable
-   api_key = os.environ.get("API_KEY")
-   ```
-3. **Update .env.example** - Add placeholder for the new variable
-4. **Re-stage and retry** - `git add . ':!.auto-claude' && git commit ...`
-
-**If it's a false positive:**
-- Add the file pattern to `.secretsignore` in the project root
-- Example: `echo 'tests/fixtures/' >> .secretsignore`
-
-### Create the Commit
-
-```bash
-# FIRST: Make sure you're in the working directory root (check YOUR ENVIRONMENT section at top)
-pwd  # Should match your working directory
-
-# Add all files EXCEPT .auto-claude directory (spec files should never be committed)
 git add . ':!.auto-claude'
-
-# If git add fails with "pathspec did not match", you have a path problem:
-# 1. Run pwd to see where you are
-# 2. Run git status to see what git sees
-# 3. Adjust your paths accordingly
-
-git commit -m "auto-claude: Complete [subtask-id] - [subtask description]
-
-- Files modified: [list]
-- Verification: [type] - passed
-- Phase progress: [X]/[Y] subtasks complete"
+git commit -m "auto-claude: [subtask-id] - [short description]"
 ```
 
-**CRITICAL**: The `:!.auto-claude` pathspec exclusion ensures spec files are NEVER committed.
-These are internal tracking files that must stay local.
+The `:!.auto-claude` exclusion ensures spec files are never committed.
+
+If git add fails — check `pwd` and adjust paths. If commit is blocked by secret scanning — move secrets to env vars and retry.
 
 ### DO NOT Push to Remote
 
