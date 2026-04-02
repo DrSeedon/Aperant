@@ -496,6 +496,15 @@ app.whenReady().then(() => {
     });
   }, 5000);
 
+  // Start local API server for MCP/external tools
+  import('./api-server').then(({ startApiServer }) => {
+    if (agentManager) {
+      startApiServer(agentManager);
+    }
+  }).catch((err) => {
+    console.warn('[main] Failed to start API server:', err);
+  });
+
   // Initialize Claude profile manager, then start usage monitor
   // We do this sequentially to ensure profile data (including auto-switch settings)
   // is loaded BEFORE the usage monitor attempts to read settings.
@@ -644,6 +653,7 @@ app.on('before-quit', (event) => {
 
   // Stop synchronous services immediately
   stopPeriodicUpdates();
+  import('./api-server').then(({ stopApiServer }) => stopApiServer()).catch(() => {});
 
   const usageMonitor = getUsageMonitor();
   usageMonitor.stop();

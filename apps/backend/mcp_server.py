@@ -19,7 +19,6 @@ Setup (global, all projects):
 
 import json
 import os
-import signal
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -42,9 +41,6 @@ mcp = FastMCP(
         "If APERANT_PROJECT env is set, it's the default project_dir."
     ),
 )
-
-_running_processes: dict[str, subprocess.Popen] = {}
-
 
 def _get_project_dir(project_dir: str | None = None) -> Path:
     d = project_dir or os.environ.get("APERANT_PROJECT") or os.getcwd()
@@ -222,8 +218,7 @@ def get_task_status(spec: str, project_dir: str | None = None) -> str:
         return f"Spec '{spec}' not found"
 
     summary = _task_summary(spec_dir)
-    pid_key = f"{pd}:{spec_dir.name}"
-    is_running = pid_key in _running_processes and _running_processes[pid_key].poll() is None
+    is_running = summary["status"] == "in_progress" or summary["in_progress"] > 0
 
     progress_file = spec_dir / "build-progress.txt"
     last_progress = ""
@@ -236,7 +231,7 @@ def get_task_status(spec: str, project_dir: str | None = None) -> str:
         f"Status: {summary['status']}",
         f"Subtasks: {summary['subtasks']}",
         f"QA: {summary['qa_status']}",
-        f"Running: {'yes (PID ' + str(_running_processes[pid_key].pid) + ')' if is_running else 'no'}",
+        f"Running: {'yes' if is_running else 'no'}",
     ]
     if last_progress:
         parts.append(f"Last progress: {last_progress}")
@@ -262,15 +257,8 @@ def delete_task(spec: str, project_dir: str | None = None) -> str:
     if not spec_dir:
         return f"Spec '{spec}' not found."
 
-    # Stop if running
-    pid_key = f"{pd}:{spec_dir.name}"
-    proc = _running_processes.get(pid_key)
-    if proc and proc.poll() is None:
-        try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        except (ProcessLookupError, OSError):
-            proc.kill()
-        del _running_processes[pid_key]
+    # Stop if running (via Aperant UI API)
+    _api_request("/api/tasks/stop", {"taskId": spec_dir.name})
 
     # Delete worktree if exists
     worktree_dir = pd / ".auto-claude" / "worktrees" / "tasks" / spec_dir.name
@@ -412,6 +400,50 @@ def create_task(
 # ── Execution ────────────────────────────────────────────────────
 
 
+def _get_api_port() -> int | None:
+    """Read Aperant UI API port from well-known location."""
+    import platform
+    # Electron app.getPath('userData') uses package.json name: "auto-claude-ui"
+    app_name = "auto-claude-ui"
+    if platform.system() == "Linux":
+        port_file = Path.home() / ".config" / app_name / "api-port"
+    elif platform.system() == "Darwin":
+        port_file = Path.home() / "Library" / "Application Support" / app_name / "api-port"
+    else:
+        port_file = Path.home() / "AppData" / "Roaming" / app_name / "api-port"
+    if port_file.exists():
+        try:
+            return int(port_file.read_text().strip())
+        except (ValueError, OSError):
+            pass
+    return None
+
+
+def _api_request(endpoint: str, data: dict) -> dict:
+    """Send request to Aperant UI API."""
+    import urllib.request
+    import urllib.error
+
+    port = _get_api_port()
+    if not port:
+        return {"success": False, "error": "Aperant UI is not running (no api-port file). Start Aperant desktop app first."}
+
+    url = f"http://127.0.0.1:{port}{endpoint}"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.URLError as e:
+        return {"success": False, "error": f"Cannot connect to Aperant UI on port {port}: {e}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @mcp.tool()
 def start_task(
     spec: str,
@@ -420,7 +452,9 @@ def start_task(
     skip_qa: bool = False,
     direct: bool = False,
 ) -> str:
-    """Start a task (spec creation → build → QA). Non-blocking — runs in background.
+    """Start a task (spec creation → build → QA). Requires Aperant UI running.
+
+    Sends request to Aperant UI which handles OAuth, process management, and monitoring.
 
     Args:
         spec: Spec identifier (e.g., '001')
@@ -434,52 +468,24 @@ def start_task(
     if not spec_dir:
         return f"Spec '{spec}' not found"
 
-    pid_key = f"{pd}:{spec_dir.name}"
-    if pid_key in _running_processes and _running_processes[pid_key].poll() is None:
-        return f"Task {spec_dir.name} is already running (PID {_running_processes[pid_key].pid})"
-
-    args = [
-        _get_python(), str(RUN_PY),
-        "--spec", spec_dir.name,
-        "--project-dir", str(pd),
-        "--auto-continue", "--force",
-    ]
+    data: dict = {"specId": spec_dir.name, "projectDir": str(pd)}
     if model:
-        args.extend(["--model", model])
+        data["model"] = model
     if skip_qa:
-        args.append("--skip-qa")
+        data["skipQa"] = True
     if direct:
-        args.append("--direct")
-    else:
-        args.append("--isolated")
+        data["direct"] = True
 
-    env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
+    result = _api_request("/api/tasks/start", data)
 
-    log_file = spec_dir / "mcp_build.log"
-    log_fh = open(log_file, "w", encoding="utf-8")
-
-    proc = subprocess.Popen(
-        args,
-        cwd=str(pd),
-        stdout=log_fh,
-        stderr=subprocess.STDOUT,
-        env=env,
-        start_new_session=True,
-    )
-    _running_processes[pid_key] = proc
-
-    return (
-        f"✓ Task {spec_dir.name} started (PID {proc.pid})\n"
-        f"Log: {log_file}\n"
-        f"Use get_task_status to check progress."
-    )
+    if result.get("success"):
+        return f"✓ Task {spec_dir.name} started via Aperant UI.\nUse get_task_status to check progress."
+    return f"✗ {result.get('error', 'Unknown error')}"
 
 
 @mcp.tool()
 def stop_task(spec: str, project_dir: str | None = None) -> str:
-    """Stop a running task.
+    """Stop a running task. Requires Aperant UI running.
 
     Args:
         spec: Spec identifier
@@ -490,18 +496,10 @@ def stop_task(spec: str, project_dir: str | None = None) -> str:
     if not spec_dir:
         return f"Spec '{spec}' not found"
 
-    pid_key = f"{pd}:{spec_dir.name}"
-    proc = _running_processes.get(pid_key)
-    if not proc or proc.poll() is not None:
-        return "Task is not running."
-
-    try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-    except (ProcessLookupError, OSError):
-        proc.kill()
-
-    del _running_processes[pid_key]
-    return f"✓ Task {spec_dir.name} stopped."
+    result = _api_request("/api/tasks/stop", {"taskId": spec_dir.name})
+    if result.get("success"):
+        return f"✓ Task {spec_dir.name} stopped."
+    return f"✗ {result.get('error', 'Unknown error')}"
 
 
 @mcp.tool()
