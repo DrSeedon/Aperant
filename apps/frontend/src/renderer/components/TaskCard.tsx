@@ -52,7 +52,7 @@ const CategoryIcon: Record<TaskCategory, typeof Zap> = {
 // XState handles normal process-exit transitions via PROCESS_EXITED events.
 // This is a safety net: if XState fails to transition after the process dies,
 // flag it as stuck. checkTaskRunning is a lightweight IPC call.
-const STUCK_CHECK_INTERVAL_MS = 15_000;
+const STUCK_CHECK_INTERVAL_MS = 30_000;
 
 interface TaskCardProps {
   task: Task;

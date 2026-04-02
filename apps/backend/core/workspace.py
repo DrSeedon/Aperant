@@ -297,9 +297,11 @@ def merge_existing_build(
         if wt_dir.exists():
             _shutil.rmtree(wt_dir, ignore_errors=True)
             print_status("Worktree deleted", "success")
-        # Delete git branch
-        run_git(["branch", "-D", f"auto-claude/{spec_name}"], cwd=project_dir)
-        print_status("Branch deleted", "success")
+        # Delete git branch (local + remote)
+        branch_name = f"auto-claude/{spec_name}"
+        run_git(["branch", "-D", branch_name], cwd=project_dir)
+        run_git(["push", "origin", "--delete", branch_name], cwd=project_dir)
+        print_status("Branch deleted (local + remote)", "success")
 
     if no_commit:
         content = [

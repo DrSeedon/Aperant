@@ -67,7 +67,7 @@ const taskStatusChangeListeners = new Set<(taskId: string, oldStatus: TaskStatus
  * This prevents race conditions where stuck detection fires before process is registered.
  */
 const taskLastActivity = new Map<string, number>();
-const STUCK_ACTIVITY_THRESHOLD_MS = 15_000; // 15 seconds — matches stuck check interval
+const STUCK_ACTIVITY_THRESHOLD_MS = 30_000; // 30 seconds — matches stuck check interval
 
 /**
  * Record activity for a task (call this when we receive execution progress or status updates)
