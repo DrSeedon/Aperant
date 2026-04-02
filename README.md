@@ -15,7 +15,7 @@ Control Aperant from Claude Code in another terminal. One server manages multipl
 - **Full lifecycle:** create task (17 params, Literal enums) → build → QA → approve/reject → merge → PR
 - **GitHub integration:** import issues as tasks, list PRs
 - **Strategic tools:** roadmap (view/generate/accept features), ideation (generate/accept/dismiss ideas)
-- **Non-blocking builds:** `start_task` runs in background, poll with `get_task_status`
+- **Builds via Electron API:** `start_task` delegates to UI via local HTTP (OAuth handled by Electron, zero tokens in MCP)
 - **Auto-refresh:** UI picks up MCP/CLI changes every 10s
 - Setup: add to `~/.claude/settings.json`, see [MCP_GUIDE.md](MCP_GUIDE.md)
 
