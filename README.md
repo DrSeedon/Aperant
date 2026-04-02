@@ -1,6 +1,6 @@
 # Aperant (Russian Fork)
 
-> **Fork of [AndyMik90/Aperant](https://github.com/AndyMik90/Aperant)** — rolled back to stable **v2.7.6** with Russian localization and bug fixes.
+> **Fork of [AndyMik90/Aperant](https://github.com/AndyMik90/Aperant)** — rolled back to stable **v2.7.6** with Russian localization, MCP server, and agent optimizations.
 
 **Autonomous multi-agent coding framework that plans, builds, and validates software for you.**
 
@@ -8,34 +8,52 @@
 
 ## What's different in this fork
 
-Based on **v2.7.6 stable** → version **2.7.7-fork.1**
+Based on **v2.7.6 stable** → version **2.7.8-fork.2**
+
+### External MCP Server (29 tools)
+Control Aperant from Claude Code in another terminal. One server manages multiple projects.
+- **Full lifecycle:** create task → build → QA → approve/reject → merge → PR
+- **GitHub integration:** import issues as tasks, list PRs
+- **Strategic tools:** roadmap (view/generate/accept features), ideation (generate/accept/dismiss ideas)
+- **Non-blocking builds:** `start_task` runs in background, poll with `get_task_status`
+- Setup: add to `~/.claude/settings.json`, see [MCP_GUIDE.md](MCP_GUIDE.md)
+
+### Project Map
+Auto-generated `.auto-claude/project_map.md` — AST-parsed project structure injected into agent prompts.
+- Python AST: classes, functions, imports per module
+- TypeScript regex: exported functions and classes
+- Database: ORM tables with columns
+- Updated automatically after every merge, created on first access
+- Agents receive full project map in system prompt — zero exploration overhead
+
+### Agent Performance (61% waste → ~15%)
+- **4 MCP tools** — `complete_subtask`, `get_next_subtask`, `run_verification`, `append_progress`
+- **coder.md** slimmed 33KB → 20KB — removed ritual overhead
+- **Per-subtask model selection** — haiku/sonnet/opus assigned by complexity
+- **Model auto-escalation** — haiku fails → sonnet → opus
+- **Prompt injection** — spec.md, progress, project map injected (0 startup reads)
 
 ### Localization
 - **Russian UI** — 11 locale files (3500+ lines), CLDR pluralization
 - **Dynamic agent language** — agents respond in UI-selected language
-- **Cyrillic-safe JSON** — `ensure_ascii=False` in spec pipeline
 
-### Agent Performance (61% waste → ~15%)
-- **4 new MCP tools** — `complete_subtask`, `get_next_subtask`, `run_verification`, `append_progress`
-- **coder.md** slimmed 33KB → 20KB — removed ritual overhead
-- **Smart splitting** — planner creates 1-2 subtasks for trivial tasks (was 6)
-- **Auto-verification** — `run_verification()` runs test commands and compares output automatically
-- **Per-subtask model selection** — planner assigns haiku/sonnet/opus per subtask complexity
-- **Model auto-escalation** — haiku fails → sonnet → opus automatically
-- **Prompt injection** — spec.md, progress, venv path injected into prompt (0 startup Read's)
-- **exitReason tracking** — agent writes why it stopped, UI shows specific reason
+### Stability
+- **Electron 41.1.1** (Chromium 146) — fixes GPU crash on Linux ([#1906](https://github.com/AndyMik90/Aperant/issues/1906))
+- **Stuck detection 15s** (was 60s) — 4x faster recovery
+- **Startup recovery** — resets stuck subtasks on app launch
+- **Crash logging** — child/render process crashes logged with details
 
 ### UI
-- Model badge per subtask (haiku 🟢 / sonnet 🔵 / opus 🟣)
-- exitReason in stuck task warning (not just "Task Appears Stuck")
-- Log grouping by subtask (collapsible sections)
-- Subtask title/description deduplication
-- DevTools hidden in dev mode (`NO_DEVTOOLS=1`)
+- QA progress bar with phase counter (3/9) instead of bouncing animation
+- Color-coded timestamps in logs (green = fresh, red = old)
+- Last AI activity time on kanban cards
+- Model badge per subtask (haiku/sonnet/opus)
+- Dev server on port 5199 (avoids Vite conflicts)
 
 ### Docs
-- [ARCHITECTURE.md](ARCHITECTURE.md) — project map for AI agents
-- [TODO.md](TODO.md) — prioritized roadmap
+- [MCP_GUIDE.md](MCP_GUIDE.md) — MCP server setup and workflows
 - [CHANGELOG.md](CHANGELOG.md) — full list of changes
+- [TODO.md](TODO.md) — prioritized roadmap
 
 ### Why v2.7.6?
 Upstream v2.8.0-beta rewrote the entire Python backend to TypeScript in a single commit, breaking agent execution. The project has 255 unreviewed PRs and the sole maintainer hasn't merged anything since Feb 14. This fork stays on the last stable release that actually works.

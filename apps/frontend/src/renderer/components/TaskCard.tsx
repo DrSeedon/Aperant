@@ -31,7 +31,7 @@ import {
   JSON_ERROR_PREFIX,
   JSON_ERROR_TITLE_SUFFIX
 } from '../../shared/constants';
-import { stopTask, checkTaskRunning, recoverStuckTask, isIncompleteHumanReview, archiveTasks, hasRecentActivity, startTaskOrQueue } from '../stores/task-store';
+import { stopTask, checkTaskRunning, recoverStuckTask, isIncompleteHumanReview, archiveTasks, hasRecentActivity, getLastActivityTime, startTaskOrQueue } from '../stores/task-store';
 import { useToast } from '../hooks/use-toast';
 import type { Task, TaskCategory, ReviewReason, TaskStatus } from '../../shared/types';
 
@@ -48,11 +48,11 @@ const CategoryIcon: Record<TaskCategory, typeof Zap> = {
   testing: FileCode
 };
 
-// Catastrophic stuck detection interval (ms).
-// XState handles all normal process-exit transitions via PROCESS_EXITED events.
-// This is a last-resort safety net: if XState somehow fails to transition the task
-// out of in_progress after the process dies, flag it as stuck after 60 seconds.
-const STUCK_CHECK_INTERVAL_MS = 60_000;
+// Stuck detection interval (ms).
+// XState handles normal process-exit transitions via PROCESS_EXITED events.
+// This is a safety net: if XState fails to transition after the process dies,
+// flag it as stuck. checkTaskRunning is a lightweight IPC call.
+const STUCK_CHECK_INTERVAL_MS = 15_000;
 
 interface TaskCardProps {
   task: Task;
@@ -139,7 +139,8 @@ export const TaskCard = memo(function TaskCard({
   const [isRecovering, setIsRecovering] = useState(false);
   const stuckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isRunning = task.status === 'in_progress';
+  const isActiveProcess = task.status === 'in_progress';
+  const isRunning = isActiveProcess || task.status === 'ai_review';
   const executionPhase = task.executionProgress?.phase;
   const hasActiveExecution = executionPhase && executionPhase !== 'idle' && executionPhase !== 'complete' && executionPhase !== 'failed';
 
@@ -169,11 +170,21 @@ export const TaskCard = memo(function TaskCard({
     return task.title;
   }, [task.title, t]);
 
-  // Memoize relative time (recalculates only when updatedAt changes)
-  const relativeTime = useMemo(
-    () => formatRelativeTime(task.updatedAt),
-    [task.updatedAt]
-  );
+  // Show last AI activity time for running tasks, updatedAt otherwise
+  const [relativeTime, setRelativeTime] = useState(() => formatRelativeTime(task.updatedAt));
+  useEffect(() => {
+    if (!isRunning) {
+      setRelativeTime(formatRelativeTime(task.updatedAt));
+      return;
+    }
+    const update = () => {
+      const lastActivity = getLastActivityTime(task.id);
+      setRelativeTime(lastActivity ? formatRelativeTime(new Date(lastActivity)) : formatRelativeTime(task.updatedAt));
+    };
+    update();
+    const interval = setInterval(update, 10_000);
+    return () => clearInterval(interval);
+  }, [task.id, task.updatedAt, isRunning]);
 
   // Memoize status menu items to avoid recreating on every render
   const statusMenuItems = useMemo(() => {
@@ -192,7 +203,7 @@ export const TaskCard = memo(function TaskCard({
   // XState handles all normal transitions via PROCESS_EXITED events.
   // This only fires if XState somehow fails to transition after 60s with no activity.
   useEffect(() => {
-    if (!isRunning) {
+    if (!isActiveProcess) {
       setIsStuck(false);
       if (stuckIntervalRef.current) {
         clearInterval(stuckIntervalRef.current);
@@ -224,7 +235,7 @@ export const TaskCard = memo(function TaskCard({
         clearInterval(stuckIntervalRef.current);
       }
     };
-  }, [task.id, isRunning]);
+  }, [task.id, isActiveProcess]);
 
   const handleStartStop = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -511,6 +522,7 @@ export const TaskCard = memo(function TaskCard({
               phase={executionPhase}
               subtasks={task.subtasks}
               phaseProgress={task.executionProgress?.phaseProgress}
+              statusMessage={task.executionProgress?.message}
               isStuck={isStuck}
               isRunning={isRunning}
             />

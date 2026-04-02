@@ -183,7 +183,26 @@ def generate_environment_context(project_dir: Path, spec_dir: Path) -> str:
         except Exception:
             pass
 
-    sections.append(f"""## YOUR ENVIRONMENT
+    # Inject project map (auto-generated, contains full project structure)
+    project_map_content = ""
+    project_map_file = (spec_dir.parent.parent / "project_map.md") if spec_dir.parent.name == "specs" else None
+    if project_map_file:
+        if not project_map_file.exists():
+            try:
+                from core.project_map import update_project_map
+                update_project_map(project_dir)
+            except Exception:
+                pass
+        if project_map_file.exists():
+            try:
+                pm_text = project_map_file.read_text(encoding="utf-8")
+                if len(pm_text) > 8000:
+                    pm_text = pm_text[:8000] + "\n\n... (truncated, full map in .auto-claude/project_map.md)"
+                project_map_content = f"\n## PROJECT MAP\n\n{pm_text}\n\n---\n\n"
+            except Exception:
+                pass
+
+    sections.append(f"""{project_map_content}## YOUR ENVIRONMENT
 
 **Working Directory:** `{project_dir}`
 **Spec Location:** `{relative_spec}/`

@@ -10,6 +10,8 @@ interface PhaseProgressIndicatorProps {
   phaseLogs?: TaskLogs | null;
   /** Fallback progress percentage (0-100) when phaseLogs unavailable */
   phaseProgress?: number;
+  /** Current status message from execution progress (e.g., QA phase info) */
+  statusMessage?: string;
   isStuck?: boolean;
   isRunning?: boolean;
   className?: string;
@@ -54,6 +56,7 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
   subtasks,
   phaseLogs,
   phaseProgress,
+  statusMessage,
   isStuck = false,
   isRunning = false,
   className,
@@ -107,10 +110,17 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
     return codingEntries;
   };
 
+  // Parse QA step progress from statusMessage (e.g., "CODE REVIEW (6/9)")
+  const qaStepMatch = statusMessage?.match(/\((\d+)\/(\d+)\)/);
+  const qaStepCurrent = qaStepMatch ? parseInt(qaStepMatch[1], 10) : 0;
+  const qaStepTotal = qaStepMatch ? parseInt(qaStepMatch[2], 10) : 0;
+  const qaStepProgress = qaStepTotal > 0 ? Math.round((qaStepCurrent / qaStepTotal) * 100) : 0;
+  const hasQaSteps = qaStepTotal > 0 && isRunning && (phase === 'qa_review' || phase === 'qa_fixing');
+
   // Determine if we should show indeterminate (activity) vs determinate (%) progress
-  const isIndeterminatePhase = phase === 'planning' || phase === 'qa_review' || phase === 'qa_fixing';
-  // Show subtask progress whenever subtasks exist (stops pulsing animation when spec completes)
-  const showSubtaskProgress = totalSubtasks > 0;
+  const isIndeterminatePhase = phase === 'planning' || ((phase === 'qa_review' || phase === 'qa_fixing') && !hasQaSteps);
+  // Show subtask progress during coding; QA uses step-based progress instead
+  const showSubtaskProgress = totalSubtasks > 0 && !hasQaSteps && !(isIndeterminatePhase && isRunning);
 
   const colors = PHASE_COLORS[phase] || PHASE_COLORS.idle;
   const phaseLabel = t(PHASE_LABEL_KEYS[phase] || PHASE_LABEL_KEYS.idle);
@@ -122,10 +132,10 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {isStuck ? t('execution.labels.interrupted') : showSubtaskProgress ? t('execution.labels.progress') : phaseLabel}
+            {isStuck ? t('execution.labels.interrupted') : hasQaSteps || (isIndeterminatePhase && isRunning) ? phaseLabel : showSubtaskProgress ? t('execution.labels.progress') : phaseLabel}
           </span>
           {/* Activity indicator dot for non-coding phases - only animate when visible */}
-          {isRunning && !isStuck && isIndeterminatePhase && (
+          {isRunning && !isStuck && (isIndeterminatePhase || hasQaSteps) && (
             <motion.div
               className={cn('h-1.5 w-1.5 rounded-full', colors.color)}
               animate={shouldAnimate ? {
@@ -141,7 +151,9 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
           )}
         </div>
         <span className="text-xs font-medium text-foreground">
-          {showSubtaskProgress ? (
+          {hasQaSteps ? (
+            `${qaStepCurrent}/${qaStepTotal}`
+          ) : showSubtaskProgress ? (
             `${subtaskProgress}%`
           ) : activeEntries > 0 ? (
             <span className="text-muted-foreground">
@@ -171,6 +183,15 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
               initial={{ opacity: 0 }}
               animate={isVisible ? { opacity: [0.3, 0.6, 0.3] } : { opacity: 0.45 }}
               transition={isVisible ? { duration: 2, repeat: Infinity, ease: 'easeInOut' } : undefined}
+            />
+          ) : hasQaSteps ? (
+            // QA step-based determinate progress
+            <motion.div
+              key="qa-steps"
+              className={cn('h-full rounded-full', colors.color)}
+              initial={{ width: 0 }}
+              animate={{ width: `${qaStepProgress}%` }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
             />
           ) : showSubtaskProgress ? (
             // Determinate progress for coding phase

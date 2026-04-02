@@ -71,20 +71,27 @@ except ImportError:
 
 
 def _update_shared_project_context(project_dir: Path, spec_name: str) -> None:
-    """Copy per-spec project_index.json to shared .auto-claude/project_index.json after merge."""
+    """Copy per-spec project_index.json to shared .auto-claude/project_index.json after merge.
+    Also updates project_map.md with AST-parsed module info."""
     import json as _json
     try:
         spec_pi = project_dir / ".auto-claude" / "specs" / spec_name / "project_index.json"
         shared_pi = project_dir / ".auto-claude" / "project_index.json"
         if spec_pi.exists():
             spec_data = _json.loads(spec_pi.read_text(encoding="utf-8"))
-            # Only update if spec version has services (not empty)
             if spec_data.get("services"):
                 shared_pi.write_text(
                     _json.dumps(spec_data, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8",
                 )
                 print_status("Shared project context updated", "success")
+    except Exception:
+        pass
+
+    try:
+        from core.project_map import update_project_map
+        update_project_map(project_dir, spec_name=spec_name)
+        print_status("Project map updated", "success")
     except Exception:
         pass  # Non-critical — don't fail merge
 

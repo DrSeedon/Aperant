@@ -1,3 +1,69 @@
+## 2.7.8-fork.2 — MCP Server, Project Map, Crash Fix (2026-04-02)
+
+### External MCP Server (29 tools)
+New standalone MCP server for controlling Aperant from Claude Code. One server manages multiple projects.
+
+**Task management:** `list_tasks`, `get_task_details`, `get_task_status`, `create_task`
+**Execution:** `start_task` (non-blocking), `stop_task`, `recover_task`
+**Review:** `approve_task`, `reject_task` (with feedback → QA_FIX_REQUEST.md)
+**QA:** `run_qa`, `qa_status`
+**Workspace:** `list_worktrees`, `review_build`, `merge_preview`, `merge_build`, `discard_build`
+**GitHub:** `list_issues`, `get_issue`, `import_issue` (→ creates task), `list_prs`, `create_pr`
+**Roadmap:** `get_roadmap`, `generate_roadmap`, `accept_roadmap_feature` (→ creates task)
+**Ideation:** `get_ideas`, `generate_ideas`, `accept_idea` (→ creates task), `dismiss_idea`
+
+- FastMCP 3.2+ stdio transport, Python
+- `MCP_GUIDE.md` — setup (global / per-project / multi-project orchestrator) + workflows
+- `start_task` is non-blocking (Popen), `get_task_status` for polling
+- GitHub tools use `gh` CLI — no token config needed
+
+### Project Map
+Auto-generated `.auto-claude/project_map.md` — full project structure with AST-parsed modules.
+
+- **Python:** AST parsing — classes, functions, imports
+- **TypeScript/JS:** regex parsing — exported functions, classes
+- **Database:** ORM models → table names, columns
+- **Task tracking:** "Modified by task 008" tags on changed modules
+- **Auto-generation:** created on first access if missing, updated after every merge
+- **Injected into prompts:** planner/coder get full project map in system prompt automatically
+- **Incremental updates:** preserves AI-written descriptions, only updates changed modules
+
+### Electron 40 → 41.1.1
+- **Fixes GPU process crash** on Linux (Chromium 144 → 146) — the #1 crash cause
+- GPU subprocess was spiking to 1.6GB RAM during kanban re-renders on task completion
+- Upstream issues: [#1906](https://github.com/AndyMik90/Aperant/issues/1906), [#1954](https://github.com/AndyMik90/Aperant/issues/1954)
+- Removed all GPU workarounds (disable-gpu-sandbox, ozone-platform-hint) — no longer needed
+
+### QA Progress on Kanban
+- QA phases shown as filling progress bar (3/9) instead of bouncing animation
+- Parsed from QA reviewer's `## PHASE X: NAME` output
+- Label shows "Ревью" / "Исправление" + step counter
+- AI Review cards now pulse and animate (isRunning includes ai_review status)
+
+### Stuck Detection: 60s → 15s
+- Check interval reduced from 60s to 15s (4x faster detection)
+- Activity threshold aligned to 15s
+- `ai_review` status excluded from stuck detection (no process running = not stuck)
+
+### Startup Recovery
+- `runStartupRecoveryScan()` activated on app launch (was dead code)
+- Resets stuck subtasks (in_progress → pending) across all projects
+- Runs 5s after app ready to let projects load first
+
+### Log Timestamps
+- Every tool entry (Running/Done) shows `HH:MM:SS` timestamp
+- Color-coded freshness gradient: green (<1min) → yellow (3-5min) → red (>10min)
+- All entry types (text, error, success, info) have colored timestamps
+- Timestamps consistently on the right side
+
+### Other Changes
+- **Last activity on kanban cards** — running tasks show time since last AI action, not task update
+- **Dev server port** — 5173 → 5199 (avoids conflicts with other Vite projects)
+- **Crash logging** — `child-process-gone` and `render-process-gone` events logged with details
+- **Shared project context** — verified working (project_index.json + project_map.md)
+
+---
+
 ## 2.7.7-fork.1 — Russian Fork + Agent DX Overhaul (2026-04-01)
 
 Based on v2.7.6 stable. Fork: [DrSeedon/Aperant](https://github.com/DrSeedon/Aperant)

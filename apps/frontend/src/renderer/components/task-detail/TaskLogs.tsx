@@ -412,10 +412,32 @@ function LogEntry({ entry }: LogEntryProps) {
   const formatTime = (timestamp: string) => {
     try {
       const date = new Date(timestamp);
-      // Use system locale for date and time formatting
       return date.toLocaleString();
     } catch {
       return '';
+    }
+  };
+
+  const formatShortTime = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
+  const getTimestampColor = (timestamp: string) => {
+    try {
+      const ageMs = Date.now() - new Date(timestamp).getTime();
+      const ageMin = ageMs / 60_000;
+      if (ageMin < 1) return 'text-success';
+      if (ageMin < 3) return 'text-emerald-400/80';
+      if (ageMin < 5) return 'text-yellow-400/70';
+      if (ageMin < 10) return 'text-orange-400/60';
+      return 'text-destructive/50';
+    } catch {
+      return 'text-muted-foreground/50';
     }
   };
 
@@ -441,6 +463,11 @@ function LogEntry({ entry }: LogEntryProps) {
             </span>
           )}
           <SubphaseBadge />
+          {entry.timestamp && (
+            <span className={cn('text-[10px] tabular-nums ml-auto shrink-0', getTimestampColor(entry.timestamp))}>
+              {formatShortTime(entry.timestamp)}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -455,6 +482,11 @@ function LogEntry({ entry }: LogEntryProps) {
             <Icon className="h-3 w-3" />
             <CheckCircle2 className="h-3 w-3 text-success" />
             <span className="text-muted-foreground">Done</span>
+            {entry.timestamp && (
+              <span className={cn('text-[10px] tabular-nums ml-1 shrink-0', getTimestampColor(entry.timestamp))}>
+                {formatShortTime(entry.timestamp)}
+              </span>
+            )}
           </div>
           {hasDetail && (
             <button
@@ -497,6 +529,11 @@ function LogEntry({ entry }: LogEntryProps) {
           <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
           <span className="break-words flex-1">{entry.content}</span>
           <SubphaseBadge />
+          {entry.timestamp && (
+            <span className={cn('text-[10px] tabular-nums shrink-0', getTimestampColor(entry.timestamp))}>
+              {formatShortTime(entry.timestamp)}
+            </span>
+          )}
           {hasDetail && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -527,6 +564,11 @@ function LogEntry({ entry }: LogEntryProps) {
         <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
         <span className="break-words flex-1">{entry.content}</span>
         <SubphaseBadge />
+        {entry.timestamp && (
+          <span className={cn('text-[10px] tabular-nums shrink-0', getTimestampColor(entry.timestamp))}>
+            {formatShortTime(entry.timestamp)}
+          </span>
+        )}
       </div>
     );
   }
@@ -537,6 +579,11 @@ function LogEntry({ entry }: LogEntryProps) {
         <Info className="h-3 w-3 mt-0.5 shrink-0" />
         <span className="break-words flex-1">{entry.content}</span>
         <SubphaseBadge />
+        {entry.timestamp && (
+          <span className={cn('text-[10px] tabular-nums shrink-0', getTimestampColor(entry.timestamp))}>
+            {formatShortTime(entry.timestamp)}
+          </span>
+        )}
       </div>
     );
   }
@@ -545,11 +592,13 @@ function LogEntry({ entry }: LogEntryProps) {
   return (
     <div className="flex flex-col">
       <div className="flex items-start gap-2 text-xs text-muted-foreground py-0.5">
-        <span className="text-[10px] text-muted-foreground/60 tabular-nums shrink-0">
-          {formatTime(entry.timestamp)}
-        </span>
         <span className="break-words whitespace-pre-wrap flex-1">{entry.content}</span>
         <SubphaseBadge />
+        {entry.timestamp && (
+          <span className={cn('text-[10px] tabular-nums shrink-0 ml-auto', getTimestampColor(entry.timestamp))}>
+            {formatShortTime(entry.timestamp)}
+          </span>
+        )}
         {hasDetail && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}

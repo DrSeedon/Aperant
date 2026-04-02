@@ -34,3 +34,6 @@ pydantic>=2.0.0
 
 # Error tracking (optional - requires SENTRY_DSN environment variable)
 sentry-sdk>=2.0.0
+
+# MCP server for external control (Claude Code integration)
+fastmcp>=2.0.0

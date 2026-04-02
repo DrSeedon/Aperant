@@ -103,6 +103,8 @@ export default defineConfig({
       }
     },
     server: {
+      port: 5199,
+      strictPort: false,
       watch: {
         // Ignore directories to prevent HMR conflicts during merge operations
         // Using absolute paths and broader patterns

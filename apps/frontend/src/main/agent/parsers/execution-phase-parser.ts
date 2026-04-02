@@ -170,6 +170,21 @@ export class ExecutionPhaseParser extends BasePhaseParser<ExecutionPhase> {
       };
     }
 
+    // QA reviewer internal phase tracking (## PHASE X: NAME pattern from qa_reviewer.md)
+    // Updates message with current QA step without changing the execution phase
+    if ((currentPhase === 'qa_review' || currentPhase === 'qa_fixing') && originalLog.includes('## PHASE')) {
+      const qaPhaseMatch = originalLog.match(/## PHASE (\d+):\s*(.+)/);
+      if (qaPhaseMatch) {
+        const phaseNum = parseInt(qaPhaseMatch[1], 10);
+        const phaseName = qaPhaseMatch[2].trim();
+        const totalPhases = 9;
+        return {
+          phase: currentPhase,
+          message: `${phaseName} (${phaseNum}/${totalPhases})`
+        };
+      }
+    }
+
     // QA phases require at least coding phase to be completed first
     // This prevents false positives from early log messages mentioning QA
     const canEnterQAPhase = currentPhase === 'coding' || currentPhase === 'qa_review' || currentPhase === 'qa_fixing';

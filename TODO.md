@@ -6,9 +6,10 @@
 
 ## Приоритет 2 — средняя сложность
 
-- [ ] **Внешний MCP-сервер для управления Aperant** — Claude Code из другого сеанса создаёт задачи, запускает билды, проверяет статус. Референс: Aperant-MCP (15 инструментов). Портировать на Python (FastMCP). Ключ к full automation.
-- [ ] **RDR система (упрощённая)** — автовосстановление застрявших задач. 2-3 уровня эскалации: auto-continue → auto-recover → request changes. У нас есть `services/recovery.py` но без эскалации.
-- [ ] **Skill-файлы для Claude Code** — `.claude/skills/` с инструкциями как управлять задачами через MCP. Просто markdown.
+- [x] **Внешний MCP-сервер для управления Aperant** — ✅ СДЕЛАНО. `apps/backend/mcp_server.py` на FastMCP, 29 инструментов. Задачи, билды, QA, merge, PR, roadmap, ideation, GitHub issues. Гайд: `MCP_GUIDE.md`.
+- [x] **Project Map (вариант D)** — ✅ СДЕЛАНО. `core/project_map.py` AST-парсит Python, regex для TS, DB tables. Post-merge + auto-gen при первом запуске. Инжектится в промпт автоматически. Кодер не трогает.
+- [x] **RDR система** — ✅ СДЕЛАНО. `services/recovery.py` (retry/rollback/skip/escalate) + rate-limit-detector (auto-swap профилей) + stuck detection 15 сек + startup recovery scan (reset stuck subtasks при запуске app, `runStartupRecoveryScan` в agent-manager.ts, вызов через setTimeout 5s в index.ts).
+- [x] **Skill-файлы для Claude Code** — ✅ ЗАМЕНЕНО MCP-сервером. 29 тулзов в `mcp_server.py` + `MCP_GUIDE.md`. MCP даёт типизированные тулзы с валидацией — skills избыточны.
 
 ## Приоритет 3 — на потом
 
@@ -23,6 +24,18 @@
 - [x] **Bash tool_input в QA логах** — ✅ СДЕЛАНО. reviewer.py теперь показывает command
 - [x] **Auto-resolve JSON/plaintext merge conflicts** — ✅ СДЕЛАНО. workspace.py: JSON deep-merge + plaintext line-merge. Без AI.
 - [x] **UsageMonitor 429 backoff** — ✅ СДЕЛАНО. 5 мин пауза после rate limit вместо спама каждые 30 сек.
+
+## Сделано (2 апреля)
+
+- [x] **Electron 40 → 41.1.1** — фикс краша GPU/Chromium 144 при смене статуса задачи на Linux
+- [x] **MCP-сервер** — 29 инструментов (tasks, QA, merge, PR, roadmap, ideation, GitHub issues)
+- [x] **QA progress на канбане** — заполняющаяся полоска по фазам (3/9), не бегающая
+- [x] **Stuck detection 60s → 15s** — в 4 раза быстрее обнаружение зависших агентов
+- [x] **AI Review анимация** — карточка пульсирует, полоска показывает фазу QA
+- [x] **Timestamps в логах** — время на каждом tool entry, цветовой градиент свежести (зелёный→красный)
+- [x] **Last activity на карточке** — показывает время с последнего AI действия для running задач
+- [x] **Dev порт 5199** — не конфликтует с другими Vite проектами
+- [x] **Crash logging** — child-process-gone и render-process-gone в логи
 
 ## UI баги
 

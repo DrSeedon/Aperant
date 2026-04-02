@@ -352,6 +352,7 @@ if (isWindows()) {
   console.log('[main] Applied Windows GPU cache fixes');
 }
 
+
 // Initialize the application
 app.whenReady().then(() => {
   // Set app user model id for Windows
@@ -487,6 +488,14 @@ app.whenReady().then(() => {
     });
   });
 
+  // Startup recovery: reset stuck subtasks from previous crash
+  // Delay to let projects load first
+  setTimeout(() => {
+    agentManager?.runStartupRecoveryScan().catch((error) => {
+      console.warn('[main] Startup recovery scan failed:', error);
+    });
+  }, 5000);
+
   // Initialize Claude profile manager, then start usage monitor
   // We do this sequentially to ensure profile data (including auto-switch settings)
   // is loaded BEFORE the usage monitor attempts to read settings.
@@ -599,9 +608,25 @@ app.whenReady().then(() => {
 
 // Quit when all windows are closed (except on macOS)
 app.on('window-all-closed', () => {
+  console.warn('[main] All windows closed');
   if (!isMacOS()) {
     app.quit();
   }
+});
+
+// Log child/render process crashes for diagnostics
+app.on('child-process-gone', (_event, details) => {
+  console.error('[main] child-process-gone:', {
+    type: details.type,
+    reason: details.reason,
+    exitCode: details.exitCode,
+    serviceName: details.serviceName,
+    name: details.name,
+  });
+});
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  console.error('[main] render-process-gone:', { reason: details.reason, exitCode: details.exitCode });
 });
 
 // Cleanup before quit — uses event.preventDefault() to allow async PTY cleanup
