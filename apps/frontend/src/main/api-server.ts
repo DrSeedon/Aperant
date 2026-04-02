@@ -15,6 +15,7 @@ import { join } from 'path';
 import { app } from 'electron';
 import type { AgentManager } from './agent/agent-manager';
 import { projectStore } from './project-store';
+import { initializeClaudeProfileManager } from './claude-profile-manager';
 
 let server: ReturnType<typeof createServer> | null = null;
 let apiPort = 0;
@@ -88,6 +89,18 @@ export function startApiServer(agentManager: AgentManager): void {
         // Update model in metadata if provided
         if (model && task.metadata) {
           task.metadata.model = model;
+        }
+
+        // Ensure OAuth credentials are available
+        try {
+          const profileManager = await initializeClaudeProfileManager();
+          if (!profileManager.hasValidAuth()) {
+            json(res, 401, { error: 'No valid Claude authentication. Open Aperant Settings > Claude Profiles.' });
+            return;
+          }
+        } catch (authErr) {
+          json(res, 500, { error: `Auth init failed: ${authErr}` });
+          return;
         }
 
         try {
