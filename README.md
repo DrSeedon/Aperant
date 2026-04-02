@@ -10,12 +10,13 @@
 
 Based on **v2.7.6 stable** → version **2.7.8-fork.2**
 
-### External MCP Server (29 tools)
+### External MCP Server (30 tools)
 Control Aperant from Claude Code in another terminal. One server manages multiple projects.
-- **Full lifecycle:** create task → build → QA → approve/reject → merge → PR
+- **Full lifecycle:** create task (17 params, Literal enums) → build → QA → approve/reject → merge → PR
 - **GitHub integration:** import issues as tasks, list PRs
 - **Strategic tools:** roadmap (view/generate/accept features), ideation (generate/accept/dismiss ideas)
 - **Non-blocking builds:** `start_task` runs in background, poll with `get_task_status`
+- **Auto-refresh:** UI picks up MCP/CLI changes every 10s
 - Setup: add to `~/.claude/settings.json`, see [MCP_GUIDE.md](MCP_GUIDE.md)
 
 ### Project Map
@@ -37,6 +38,10 @@ Auto-generated `.auto-claude/project_map.md` — AST-parsed project structure in
 - **Russian UI** — 11 locale files (3500+ lines), CLDR pluralization
 - **Dynamic agent language** — agents respond in UI-selected language
 
+### Merge Auto-Resolve
+- Auto-commit dirty files before merge → auto-resolve .gitignore, .lock, JSON conflicts → finalize (status done + delete worktree + branch)
+- Direct merge first, smart merge fallback — handles diverged branches with uncommitted changes
+
 ### Stability
 - **Electron 41.1.1** (Chromium 146) — fixes GPU crash on Linux ([#1906](https://github.com/AndyMik90/Aperant/issues/1906))
 - **Stuck detection 15s** (was 60s) — 4x faster recovery
@@ -47,6 +52,9 @@ Auto-generated `.auto-claude/project_map.md` — AST-parsed project structure in
 - QA progress bar with phase counter (3/9) instead of bouncing animation
 - Color-coded timestamps in logs (green = fresh, red = old)
 - Last AI activity time on kanban cards
+- Usage recovery % in badge and popup
+- Metadata badges with type labels (Priority/Effort/Impact)
+- Task detail: Context Files + Agent Config sections
 - Model badge per subtask (haiku/sonnet/opus)
 - Dev server on port 5199 (avoids Vite conflicts)
 

@@ -1,9 +1,9 @@
 ## 2.7.8-fork.2 — MCP Server, Project Map, Crash Fix (2026-04-02)
 
-### External MCP Server (29 tools)
+### External MCP Server (30 tools)
 New standalone MCP server for controlling Aperant from Claude Code. One server manages multiple projects.
 
-**Task management:** `list_tasks`, `get_task_details`, `get_task_status`, `create_task`
+**Task management:** `list_tasks`, `get_task_details`, `get_task_status`, `create_task` (17 params with Literal enums), `delete_task`
 **Execution:** `start_task` (non-blocking), `stop_task`, `recover_task`
 **Review:** `approve_task`, `reject_task` (with feedback → QA_FIX_REQUEST.md)
 **QA:** `run_qa`, `qa_status`
@@ -12,10 +12,13 @@ New standalone MCP server for controlling Aperant from Claude Code. One server m
 **Roadmap:** `get_roadmap`, `generate_roadmap`, `accept_roadmap_feature` (→ creates task)
 **Ideation:** `get_ideas`, `generate_ideas`, `accept_idea` (→ creates task), `dismiss_idea`
 
-- FastMCP 3.2+ stdio transport, Python
-- `MCP_GUIDE.md` — setup (global / per-project / multi-project orchestrator) + workflows
+- FastMCP 3.2+ stdio transport, Python, Literal types for enum validation
+- `create_task` full parity with UI: category, priority, complexity, impact, rationale, acceptance_criteria, affected_files, referenced_files, model, thinking_level, fast_mode, base_branch, direct
+- `accept_idea` / `accept_roadmap_feature` auto-set sourceType, category, rationale, affectedFiles in metadata
+- `MCP_GUIDE.md` — setup (global / per-project / multi-project orchestrator) + workflows + data structure docs
 - `start_task` is non-blocking (Popen), `get_task_status` for polling
-- GitHub tools use `gh` CLI — no token config needed
+- GitHub tools are convenience wrappers around `gh` CLI
+- UI auto-refresh: 10s polling picks up MCP/CLI changes
 
 ### Project Map
 Auto-generated `.auto-claude/project_map.md` — full project structure with AST-parsed modules.
@@ -56,10 +59,27 @@ Auto-generated `.auto-claude/project_map.md` — full project structure with AST
 - All entry types (text, error, success, info) have colored timestamps
 - Timestamps consistently on the right side
 
+### Merge Auto-Resolve
+- **Auto-commit** dirty files before merge (stash doesn't survive rebase/checkout) with undo in finally
+- **Auto-resolve .gitignore conflicts** — line-merge unique entries from both sides (fixed: `.gitignore` has no file extension, was checking `Path.suffix`)
+- **Auto-resolve .lock files** (uv.lock, package-lock.json) — `checkout --theirs`
+- **Auto-resolve JSON conflicts** — deep-merge with theirs-wins strategy
+- **Post-merge finalize** — status → done, worktree deleted, branch deleted (was missing from CLI/MCP merge path)
+- Direct merge attempted first, smart merge as fallback — avoids rebase/checkout issues
+
+### UI Improvements
+- **Metadata badges** — "Medium Priority" / "Medium Effort" / "Medium Impact" instead of ambiguous "Medium" × 3
+- **sourceType "manual" hidden** — only show ideation/roadmap/github badges
+- **Task detail: Context Files** — referenced files shown in Overview
+- **Task detail: Agent Config** — model, thinking level, branch, fast mode, direct mode shown in Overview
+- **AI Review badge fix** — human_review/done tasks no longer show stale purple QA badge from crashed sessions
+- **Usage recovery %** — session/weekly usage shows recovery progress in parentheses (badge + popup), same color as main %
+
 ### Other Changes
 - **Last activity on kanban cards** — running tasks show time since last AI action, not task update
 - **Dev server port** — 5173 → 5199 (avoids conflicts with other Vite projects)
 - **Crash logging** — `child-process-gone` and `render-process-gone` events logged with details
+- **UI auto-refresh** — 10s polling for external changes (MCP, CLI)
 - **Shared project context** — verified working (project_index.json + project_map.md)
 
 ---

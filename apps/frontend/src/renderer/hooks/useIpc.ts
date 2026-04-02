@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import { useTaskStore } from '../stores/task-store';
+import { useTaskStore, loadTasks } from '../stores/task-store';
 import { useRoadmapStore } from '../stores/roadmap-store';
 import { useRateLimitStore } from '../stores/rate-limit-store';
 import { useAuthFailureStore } from '../stores/auth-failure-store';
@@ -378,6 +378,15 @@ export function useIpcListeners(): void {
       }
     );
 
+    // Poll for external changes (MCP, CLI) every 10 seconds
+    // Lightweight: only refreshes if specs dir was modified
+    const pollInterval = setInterval(() => {
+      const projectId = useProjectStore.getState().activeProjectId;
+      if (projectId) {
+        loadTasks(projectId).catch(() => {});
+      }
+    }, 10_000);
+
     // Cleanup on unmount
     return () => {
       // Flush any pending batched updates before cleanup
@@ -386,6 +395,7 @@ export function useIpcListeners(): void {
         flushBatch();
         batchTimeout = null;
       }
+      clearInterval(pollInterval);
       cleanupProgress();
       cleanupError();
       cleanupLog();

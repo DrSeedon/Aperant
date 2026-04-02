@@ -141,8 +141,10 @@ export const TaskCard = memo(function TaskCard({
 
   const isActiveProcess = task.status === 'in_progress';
   const isRunning = isActiveProcess || task.status === 'ai_review';
-  const executionPhase = task.executionProgress?.phase;
-  const hasActiveExecution = executionPhase && executionPhase !== 'idle' && executionPhase !== 'complete' && executionPhase !== 'failed';
+  const isFinished = task.status === 'done' || task.status === 'human_review';
+  // Use real execution phase only while process is running; finished tasks show as complete
+  const executionPhase = isActiveProcess ? task.executionProgress?.phase : (isFinished ? 'complete' as const : task.executionProgress?.phase);
+  const hasActiveExecution = isActiveProcess && executionPhase && executionPhase !== 'idle' && executionPhase !== 'complete' && executionPhase !== 'failed';
 
   // Check if task is in human_review but has no completed subtasks (crashed/incomplete)
   const isIncomplete = isIncompleteHumanReview(task);

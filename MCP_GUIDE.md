@@ -52,177 +52,326 @@ Add `.mcp.json` to your project root:
 }
 ```
 
-Then `project_dir` defaults to `APERANT_PROJECT` — no need to pass it every time:
-```
-mcp__aperant__list_tasks()
-```
+Then `project_dir` defaults to `APERANT_PROJECT` — no need to pass it every time.
 
 ### Option 3: Multi-project orchestrator
 
-For managing 4+ projects from one place, use global setup (Option 1) and always pass `project_dir`. Example workflow:
+For managing 4+ projects from one place, use global setup (Option 1) and always pass `project_dir`.
 
-```
-# Check all projects
-mcp__aperant__list_tasks(project_dir="/projects/api-service")
-mcp__aperant__list_tasks(project_dir="/projects/web-frontend")
-mcp__aperant__list_tasks(project_dir="/projects/mobile-app")
-mcp__aperant__list_tasks(project_dir="/projects/shared-lib")
+---
 
-# Start builds across projects
-mcp__aperant__start_task(spec="001", project_dir="/projects/api-service")
-mcp__aperant__start_task(spec="003", project_dir="/projects/web-frontend")
-
-# Monitor progress
-mcp__aperant__get_task_status(spec="001", project_dir="/projects/api-service")
-```
-
-## Available Tools (22)
+## Available Tools (30)
 
 ### Task Management
 
-| Tool | Description |
-|------|-------------|
-| `list_tasks` | List all tasks with status, subtask progress, QA state |
-| `get_task_details` | Full spec, subtask breakdown, QA report for a task |
-| `get_task_status` | Current status, progress, whether process is running |
-| `create_task` | Create a new task from title + description |
+**`list_tasks`** — List all tasks with status, subtask progress, QA state.
+- `project_dir` (optional) — project path
+
+**`get_task_details`** — Full spec, subtask breakdown, QA report for a task.
+- `spec` (required) — spec identifier (e.g., `001` or `001-feature-name`)
+- `project_dir` (optional)
+
+**`get_task_status`** — Current status, progress, whether process is running.
+- `spec` (required)
+- `project_dir` (optional)
+
+**`delete_task`** — Delete a task completely (spec + worktree). **Irreversible!**
+- `spec` (required)
+- `project_dir` (optional)
+- Stops running process if active, deletes spec dir and worktree
+
+**`create_task`** — Create a new task with full metadata.
+- `title` (required) — short task title
+- `description` (required) — detailed task description
+- `project_dir` (optional)
+- `category` (optional) — `feature`, `bug_fix`, `refactoring`, `documentation`, `security`, `performance`, `ui_ux`, `infrastructure`, `testing`
+- `priority` (optional) — `low`, `medium`, `high`, `urgent`
+- `complexity` (optional) — `trivial`, `small`, `medium`, `large`, `complex`
+- `impact` (optional) — `low`, `medium`, `high`, `critical`
+- `rationale` (optional) — why this task matters
+- `acceptance_criteria` (optional) — comma-separated list of done criteria
+- `affected_files` (optional) — comma-separated list of files to modify
+- `referenced_files` (optional) — comma-separated list of context files
+- `model` (optional) — `haiku`, `sonnet`, `opus`
+- `thinking_level` (optional) — `low`, `medium`, `high`
+- `fast_mode` (optional, default false) — faster Opus output
+- `base_branch` (optional) — git branch for worktree
+- `direct` (optional, default false) — build without worktree isolation
+
+Creates:
+```
+.auto-claude/specs/{NNN}-{slug}/
+  ├── spec.md                  # Title + description
+  ├── implementation_plan.json # Status, workflow_type, phases (empty until start)
+  ├── requirements.json        # Description + workflow_type
+  └── task_metadata.json       # All metadata (category, priority, model, etc.)
+```
 
 ### Execution
 
-| Tool | Description |
-|------|-------------|
-| `start_task` | Start build (non-blocking, runs in background) |
-| `stop_task` | Stop a running build |
-| `recover_task` | Restart a stuck task from last checkpoint |
+**`start_task`** — Start a task (spec creation → build → QA). Non-blocking, runs in background.
+- `spec` (required)
+- `project_dir` (optional)
+- `model` (optional) — Claude model override
+- `skip_qa` (optional, default false) — skip QA validation
+- `direct` (optional, default false) — no worktree isolation
+- Returns PID and log file path. Use `get_task_status` to poll.
+
+**`stop_task`** — Stop a running task.
+- `spec` (required)
+- `project_dir` (optional)
+
+**`recover_task`** — Recover a stuck task (restart from last checkpoint).
+- `spec` (required)
+- `project_dir` (optional)
 
 ### Review
 
-| Tool | Description |
-|------|-------------|
-| `approve_task` | Approve a completed task (mark done, ready to merge) |
-| `reject_task` | Reject with feedback → QA_FIX_REQUEST.md → re-run |
+**`approve_task`** — Approve a completed task (mark done, ready to merge).
+- `spec` (required)
+- `project_dir` (optional)
+- Updates `implementation_plan.json` status → `done`, qa_signoff → `approved`
 
-### GitHub
-
-| Tool | Description |
-|------|-------------|
-| `list_issues` | List GitHub issues (filter by state, labels) |
-| `get_issue` | Get full issue details |
-| `import_issue` | Import GitHub issue as Aperant task |
-| `list_prs` | List pull requests with review status |
+**`reject_task`** — Reject with feedback, send back for fixes.
+- `spec` (required)
+- `feedback` (required) — what needs to be fixed
+- `project_dir` (optional)
+- Creates `QA_FIX_REQUEST.md` in spec dir. Use `start_task` to re-run with fixes.
 
 ### QA
 
-| Tool | Description |
-|------|-------------|
-| `run_qa` | Run QA validation (blocking, waits for result) |
-| `qa_status` | Check QA validation state |
+**`run_qa`** — Run QA validation on a completed build. **Blocking** — waits up to 10 minutes.
+- `spec` (required)
+- `model` (optional)
+- `project_dir` (optional)
+
+**`qa_status`** — Show QA validation status.
+- `spec` (required)
+- `project_dir` (optional)
 
 ### Workspace & Merge
 
-| Tool | Description |
-|------|-------------|
-| `list_worktrees` | List all build worktrees |
-| `review_build` | Show diff of what was built |
-| `merge_preview` | Preview merge conflicts |
-| `merge_build` | Merge build into main project |
-| `discard_build` | Delete a build (irreversible) |
+**`list_worktrees`** — List all build worktrees and their status.
+- `project_dir` (optional)
+
+**`review_build`** — Show what a build contains (diff of changes).
+- `spec` (required)
+- `project_dir` (optional)
+
+**`merge_preview`** — Preview merge conflicts without merging.
+- `spec` (required)
+- `project_dir` (optional)
+- `base_branch` (optional)
+
+**`merge_build`** — Merge a completed build into the main project.
+- `spec` (required)
+- `project_dir` (optional)
+- `no_commit` (optional, default false) — stage only, don't commit
+- `base_branch` (optional)
+
+**`discard_build`** — Discard a build (delete worktree). **Irreversible!**
+- `spec` (required)
+- `project_dir` (optional)
 
 ### PR & Logs
 
-| Tool | Description |
-|------|-------------|
-| `create_pr` | Create GitHub pull request |
-| `get_build_logs` | Get recent build log output |
+**`create_pr`** — Create a GitHub pull request from a completed build.
+- `spec` (required)
+- `project_dir` (optional)
+- `target_branch` (optional)
+- `title` (optional)
+- `draft` (optional, default false)
+
+**`get_build_logs`** — Get recent build log output.
+- `spec` (required)
+- `lines` (optional, default 50) — number of lines
+- `project_dir` (optional)
+
+### GitHub (convenience wrappers around `gh` CLI)
+
+**`list_issues`** — List GitHub issues. Use `gh issue list` for advanced filters.
+- `project_dir` (optional)
+- `state` (optional, default `open`) — `open`, `closed`, `all`
+- `limit` (optional, default 20)
+- `labels` (optional) — comma-separated label filter
+
+**`get_issue`** — Get issue details. Use `gh issue view` for comments/timeline.
+- `issue_number` (required)
+- `project_dir` (optional)
+
+**`import_issue`** — Import a GitHub issue as Aperant task (creates spec from issue title+body).
+- `issue_number` (required)
+- `project_dir` (optional)
+
+**`list_prs`** — List pull requests. Use `gh pr list` for advanced queries.
+- `project_dir` (optional)
+- `state` (optional, default `open`) — `open`, `closed`, `merged`, `all`
+- `limit` (optional, default 20)
 
 ### Roadmap
 
-| Tool | Description |
-|------|-------------|
-| `get_roadmap` | View roadmap with features, milestones, and status per phase |
-| `generate_roadmap` | Generate strategic roadmap (long-running, optional competitor analysis) |
-| `accept_roadmap_feature` | Accept a feature → creates Aperant task from it |
+**`get_roadmap`** — View project roadmap with phases, features (with IDs), and milestones.
+- `project_dir` (optional)
+- Shows: `[feature-1] Feature Title (status)` — use feature ID in `accept_roadmap_feature`
+
+**`generate_roadmap`** — Generate strategic roadmap. **Long-running** (up to 10 min).
+- `project_dir` (optional)
+- `refresh` (optional, default false) — force regeneration
+- `competitor_analysis` (optional, default false) — include competitor analysis
+- `model` (optional)
+
+**`accept_roadmap_feature`** — Accept a roadmap feature → creates Aperant task with full metadata.
+- `feature_id` (required) — e.g., `feature-1`
+- `project_dir` (optional)
+- Sets: `sourceType=roadmap`, `featureId`, `rationale`, `category=feature`
 
 ### Ideation
 
-| Tool | Description |
-|------|-------------|
-| `get_ideas` | List generated ideas (filter by type) |
-| `generate_ideas` | Generate improvement ideas (code, UX, security, perf, docs, quality) |
-| `accept_idea` | Accept idea → creates Aperant task from it |
-| `dismiss_idea` | Archive/dismiss an idea |
+**`get_ideas`** — List generated ideas with status and effort.
+- `project_dir` (optional)
+- `idea_type` (optional) — filter: `code_improvements`, `ui_ux_improvements`, `documentation_gaps`, `security_hardening`, `performance_optimizations`, `code_quality`
 
-## Common Parameters
+**`generate_ideas`** — Generate improvement ideas. **Long-running** (up to 10 min).
+- `project_dir` (optional)
+- `types` (optional) — comma-separated types to generate
+- `max_ideas` (optional, default 5) — ideas per type
+- `refresh` (optional, default false)
+- `model` (optional)
 
-- `project_dir` (string, optional) — project path. Falls back to `APERANT_PROJECT` env, then `cwd`
-- `spec` (string) — spec identifier. Can be short (`001`) or full (`001-feature-name`)
-- `model` (string, optional) — Claude model override (e.g., `claude-sonnet-4-20250514`)
+**`accept_idea`** — Accept an idea → creates Aperant task with full metadata.
+- `idea_id` (required) — e.g., `ci-001`
+- `project_dir` (optional)
+- Sets: `sourceType=ideation`, `ideationType`, `ideaId`, `rationale`, `affectedFiles`, `category` (auto-mapped from idea type), `complexity`
+
+**`dismiss_idea`** — Archive/dismiss an idea.
+- `idea_id` (required)
+- `project_dir` (optional)
+
+---
+
+## Data Structure
+
+All task data lives in `{project}/.auto-claude/` (gitignored):
+
+```
+.auto-claude/
+├── specs/
+│   └── {NNN}-{slug}/
+│       ├── spec.md                    # Task specification
+│       ├── implementation_plan.json   # Phases, subtasks, status, QA signoff
+│       ├── requirements.json          # Task description, workflow type
+│       ├── task_metadata.json         # Full metadata (see below)
+│       ├── build-progress.txt         # Human-readable progress log
+│       ├── qa_report.md               # QA validation report
+│       ├── QA_FIX_REQUEST.md          # Rejection feedback (if rejected)
+│       ├── mcp_build.log              # Build output log (from start_task)
+│       └── attachments/               # Images (from UI only)
+├── project_index.json                 # Shared project context (tech stack, ports)
+├── project_map.md                     # AST-parsed project structure (auto-generated)
+├── roadmap/
+│   ├── roadmap.json                   # Strategic roadmap with phases and features
+│   └── competitor_analysis.json       # Competitor pain points
+└── ideation/
+    ├── ideation.json                  # All ideas merged
+    └── {type}_ideas.json              # Ideas per type
+```
+
+### task_metadata.json structure
+
+```json
+{
+  "sourceType": "manual|ideation|roadmap|github",
+  "category": "feature|bug_fix|refactoring|security|performance|...",
+  "priority": "low|medium|high|urgent",
+  "complexity": "trivial|small|medium|large|complex",
+  "estimatedEffort": "trivial|small|medium|large|complex",
+  "impact": "low|medium|high|critical",
+  "rationale": "Why this task matters",
+  "acceptanceCriteria": ["criterion 1", "criterion 2"],
+  "affectedFiles": ["path/to/file.py"],
+  "referencedFiles": [{"id": "path", "path": "path/to/file"}],
+  "model": "haiku|sonnet|opus",
+  "thinkingLevel": "low|medium|high",
+  "fastMode": false,
+  "baseBranch": "main",
+  "useWorktree": true,
+  "ideationType": "code_improvements",
+  "ideaId": "ci-001",
+  "featureId": "feature-1",
+  "githubIssueNumber": 42
+}
+```
+
+---
 
 ## Typical Workflows
 
 ### Create and build a feature
-
 ```
-1. create_task(title="Add user auth", description="Implement JWT-based authentication...")
-2. start_task(spec="014")          # non-blocking, runs in background
-3. get_task_status(spec="014")     # poll until complete
-4. get_task_details(spec="014")    # review what was built
-5. merge_build(spec="014")         # merge into project
-```
-
-### Monitor and manage multiple projects
-
-```
-1. list_tasks(project_dir="/proj/A")    # see all tasks
-2. list_tasks(project_dir="/proj/B")
-3. start_task(spec="002", project_dir="/proj/A")
-4. start_task(spec="001", project_dir="/proj/B")
-5. get_task_status(spec="002", project_dir="/proj/A")  # check progress
-6. get_build_logs(spec="002", project_dir="/proj/A")   # see what's happening
+create_task(title="Add user auth", description="JWT-based...", category="feature", priority="high")
+start_task(spec="014")
+get_task_status(spec="014")     # poll until complete
+approve_task(spec="014")
+merge_build(spec="014")
+create_pr(spec="014", target_branch="main")
 ```
 
-### Review and merge a completed build
-
+### Monitor multiple projects
 ```
-1. review_build(spec="005")        # see the diff
-2. merge_preview(spec="005")       # check for conflicts
-3. merge_build(spec="005")         # merge it
-4. create_pr(spec="005", target_branch="main", draft=true)
-```
-
-### Discover and implement improvements
-
-```
-1. generate_ideas(types="security_hardening,performance_optimizations")
-2. get_ideas()                     # review all ideas
-3. accept_idea("sh-002")           # creates task from idea
-4. start_task(spec="015")          # build it
+list_tasks(project_dir="/proj/A")
+list_tasks(project_dir="/proj/B")
+start_task(spec="002", project_dir="/proj/A")
+get_task_status(spec="002", project_dir="/proj/A")
+get_build_logs(spec="002", project_dir="/proj/A")
 ```
 
-### Strategic planning
+### GitHub issue → task → PR
+```
+list_issues()
+import_issue(42)               # creates task from issue #42
+start_task(spec="016")
+approve_task(spec="016")
+merge_build(spec="016")
+create_pr(spec="016")
+```
 
+### Ideation → task
 ```
-1. generate_roadmap(competitor_analysis=true)   # one-time generation
-2. get_roadmap()                               # view phases and milestones
-3. get_ideas(idea_type="code_improvements")    # tactical improvements
+generate_ideas(types="security_hardening,performance_optimizations")
+get_ideas()
+accept_idea("sh-002")          # creates task with metadata from idea
+start_task(spec="015")
 ```
 
-### GitHub issue → task → PR pipeline
+### Roadmap → task
+```
+get_roadmap()                  # see [feature-1], [feature-2], ...
+accept_roadmap_feature("feature-4")  # creates task with rationale
+start_task(spec="017")
+```
 
+### Review and merge
 ```
-1. list_issues()                   # see open issues
-2. import_issue(42)                # creates Aperant task from issue #42
-3. start_task(spec="016")          # build it
-4. approve_task(spec="016")        # approve
-5. merge_build(spec="016")         # merge
-6. create_pr(spec="016")           # PR back to GitHub
+review_build(spec="005")       # see diff
+merge_preview(spec="005")      # check conflicts
+merge_build(spec="005")
 ```
+
+### Reject and re-run
+```
+reject_task(spec="005", feedback="Tests fail on edge case X, need to handle null input")
+start_task(spec="005")         # re-runs with QA_FIX_REQUEST.md context
+```
+
+---
 
 ## Important Notes
 
-- `start_task` is **non-blocking** — it starts a background process and returns immediately. Use `get_task_status` to poll progress
-- `run_qa` is **blocking** — it waits for QA to complete (up to 10 minutes)
-- `discard_build` is **irreversible** — it deletes the worktree and branch
+- `start_task` is **non-blocking** — returns immediately. Use `get_task_status` to poll progress
+- `run_qa` and `generate_roadmap` and `generate_ideas` are **blocking** — wait up to 10 minutes
+- `discard_build` is **irreversible** — deletes worktree and branch
 - Builds run in **isolated git worktrees** by default (safe, won't affect main branch)
 - The server uses Aperant's own Python venv — no additional setup needed
-- All task data lives in `{project}/.auto-claude/specs/` (gitignored)
+- `list_issues`, `get_issue`, `list_prs` are convenience wrappers around `gh` CLI — use `gh` directly for advanced queries
+- `accept_idea` and `accept_roadmap_feature` auto-set `sourceType`, `category`, `rationale`, and other metadata from the source data
+- All fields except `title`, `description`, `spec`, `feedback`, `idea_id`, `feature_id`, `issue_number` are optional

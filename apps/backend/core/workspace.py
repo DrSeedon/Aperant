@@ -258,6 +258,49 @@ def merge_existing_build(
         print(highlight(f"  python auto-claude/run.py --spec {spec_name} --merge"))
         return False
 
+    # Auto-commit uncommitted changes before merge (stash doesn't survive rebase/checkout in smart merge)
+    _merge_state = {"did_autocommit": False}
+    _dirty_check = run_git(["status", "--porcelain"], cwd=project_dir)
+    if _dirty_check.returncode == 0 and _dirty_check.stdout.strip():
+        dirty_files = [l[3:] for l in _dirty_check.stdout.strip().splitlines() if len(l) > 3]
+        debug("workspace", f"Auto-committing {len(dirty_files)} uncommitted files before merge", files=dirty_files[:5])
+        run_git(["add", "-A"], cwd=project_dir)
+        commit_result = run_git(["commit", "-m", "wip: auto-save before aperant merge (will be amended)"], cwd=project_dir)
+        if commit_result.returncode == 0:
+            _merge_state["did_autocommit"] = True
+            print_status(f"Auto-committed {len(dirty_files)} uncommitted files", "info")
+
+    def _undo_autocommit() -> None:
+        if _merge_state["did_autocommit"]:
+            run_git(["reset", "--soft", "HEAD~1"], cwd=project_dir)
+            run_git(["restore", "--staged", "."], cwd=project_dir)
+            print_status("Auto-commit undone (files restored to uncommitted state)", "success")
+
+    def _finalize_merge() -> None:
+        """Update plan status to done, delete worktree and branch."""
+        import json as _json
+        import shutil as _shutil
+        from datetime import datetime as _dt, timezone as _tz
+        # Update plan status
+        plan_file = project_dir / ".auto-claude" / "specs" / spec_name / "implementation_plan.json"
+        if plan_file.exists():
+            try:
+                plan_data = _json.loads(plan_file.read_text(encoding="utf-8"))
+                plan_data["status"] = "done"
+                plan_data["planStatus"] = "done"
+                plan_data["last_updated"] = _dt.now(_tz.utc).isoformat()
+                plan_file.write_text(_json.dumps(plan_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
+        # Delete worktree directory
+        wt_dir = project_dir / ".auto-claude" / "worktrees" / "tasks" / spec_name
+        if wt_dir.exists():
+            _shutil.rmtree(wt_dir, ignore_errors=True)
+            print_status("Worktree deleted", "success")
+        # Delete git branch
+        run_git(["branch", "-D", f"auto-claude/{spec_name}"], cwd=project_dir)
+        print_status("Branch deleted", "success")
+
     if no_commit:
         content = [
             bold(f"{icon(Icons.SUCCESS)} STAGING BUILD FOR REVIEW"),
@@ -277,6 +320,55 @@ def merge_existing_build(
     show_build_summary(manager, spec_name)
     print()
 
+    try:
+        # Try direct git merge first (simpler, handles auto-resolve for .gitignore/JSON conflicts)
+        print_status("Attempting direct merge with auto-resolve...", "info")
+        spec_branch = f"auto-claude/{spec_name}"
+        direct_args = ["merge", spec_branch, "--no-edit"]
+        if no_commit:
+            direct_args.append("--no-commit")
+        direct_result = run_git(direct_args, cwd=project_dir)
+        debug("workspace", f"Direct merge rc={direct_result.returncode}", stderr=direct_result.stderr[:200] if direct_result.stderr else "")
+        if direct_result.returncode == 0:
+            print()
+            print_status("Your feature has been added to your project.", "success")
+            _update_shared_project_context(project_dir, spec_name)
+            _finalize_merge()
+            _merge_state["did_autocommit"] = False  # Don't undo — merge succeeded
+            return True
+
+        # Direct merge had conflicts — try auto-resolve (gitignore, JSON, plaintext)
+        auto_resolved = _try_auto_resolve_simple_conflicts(project_dir)
+        if auto_resolved > 0:
+            unresolved = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=project_dir)
+            remaining = [f for f in unresolved.stdout.strip().split("\n") if f.strip()] if unresolved.returncode == 0 and unresolved.stdout.strip() else []
+            if not remaining:
+                run_git(["add", "."], cwd=project_dir)
+                if not no_commit:
+                    run_git(["commit", "--no-edit"], cwd=project_dir)
+                print()
+                print_status(f"Auto-resolved {auto_resolved} conflict(s) and merged.", "success")
+                _update_shared_project_context(project_dir, spec_name)
+                _finalize_merge()
+                _did_autocommit = False  # Don't undo — merge succeeded
+                return True
+
+        # Auto-resolve couldn't fix all — abort and try smart merge
+        run_git(["merge", "--abort"], cwd=project_dir)
+        return _do_merge(project_dir, spec_name, no_commit, use_smart_merge, manager, base_branch, worktree_path)
+    finally:
+        _undo_autocommit()
+
+
+def _do_merge(
+    project_dir: Path,
+    spec_name: str,
+    no_commit: bool,
+    use_smart_merge: bool,
+    manager: "WorktreeManager",
+    base_branch: str | None,
+    worktree_path: Path,
+) -> bool:
     # Try smart merge first if enabled
     if use_smart_merge:
         smart_result = _try_smart_merge(
@@ -316,22 +408,39 @@ def merge_existing_build(
                     return True
                 else:
                     # No conflicts needed AI resolution - do standard git merge
-                    # This is the common case: no divergence, just need to merge changes
-                    success_result = manager.merge_worktree(
-                        spec_name, delete_after=False, no_commit=no_commit
-                    )
-                    if success_result:
+                    spec_branch = f"auto-claude/{spec_name}"
+                    merge_args = ["merge", spec_branch, "--no-edit"]
+                    if no_commit:
+                        merge_args.append("--no-commit")
+                    merge_result = run_git(merge_args, cwd=project_dir)
+                    debug("workspace", f"Direct merge result: rc={merge_result.returncode}", stderr=merge_result.stderr[:300] if merge_result.stderr else "", stdout=merge_result.stdout[:300] if merge_result.stdout else "")
+
+                    if merge_result.returncode == 0:
                         _print_merge_success(
                             no_commit, stats, spec_name=spec_name, keep_worktree=True
                         )
                         _update_shared_project_context(project_dir, spec_name)
                         return True
                     else:
-                        # Standard git merge failed - report error and don't continue
+                        # Git merge has conflicts — try auto-resolving (gitignore, JSON, plaintext)
+                        debug("workspace", "Git merge failed, attempting auto-resolve")
+                        resolved = _try_auto_resolve_simple_conflicts(project_dir)
+                        debug("workspace", f"Auto-resolve result: {resolved} files")
+                        if resolved > 0:
+                            check = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=project_dir)
+                            unresolved = [f for f in check.stdout.strip().split("\n") if f.strip()] if check.returncode == 0 and check.stdout.strip() else []
+                            if not unresolved:
+                                run_git(["add", "."], cwd=project_dir)
+                                if not no_commit:
+                                    run_git(["commit", "--no-edit", "-m", f"merge: auto-resolve {resolved} conflict(s) from auto-claude/{spec_name}"], cwd=project_dir)
+                                print()
+                                print_status(f"Auto-resolved {resolved} conflict(s) and merged.", "success")
+                                _update_shared_project_context(project_dir, spec_name)
+                                return True
+                        # Can't resolve — abort and fail
+                        run_git(["merge", "--abort"], cwd=project_dir)
                         print()
-                        print_status(
-                            "Merge failed. Please check the errors above.", "error"
-                        )
+                        print_status("Merge failed. Please check the errors above.", "error")
                         return False
             elif smart_result.get("git_conflicts"):
                 # Had git conflicts that AI couldn't fully resolve
@@ -461,7 +570,14 @@ def _try_auto_resolve_simple_conflicts(project_dir: Path) -> int:
                 resolved_count += 1
                 print_status(f"Auto-resolved JSON conflict: {filepath}", "success")
 
-            elif ext in (".gitignore", ".md", ".txt", ".env"):
+            elif ext == ".lock":
+                # Lock files (uv.lock, package-lock.json, etc.): take theirs
+                run_git(["checkout", "--theirs", filepath], cwd=project_dir)
+                run_git(["add", filepath], cwd=project_dir)
+                resolved_count += 1
+                print_status(f"Auto-resolved lock file conflict: {filepath} (theirs)", "success")
+
+            elif ext in (".md", ".txt", ".env") or full_path.name in (".gitignore", ".dockerignore", ".eslintignore"):
                 # Plaintext merge: combine unique lines from both sides
                 ours_result = run_git(["show", f":2:{filepath}"], cwd=project_dir)
                 theirs_result = run_git(["show", f":3:{filepath}"], cwd=project_dir)
@@ -843,7 +959,30 @@ def _try_smart_merge_inner(
                     "Git merge failed unexpectedly despite no conflicts detected",
                     stderr=merge_result.stderr[:500] if merge_result.stderr else "",
                 )
-                # Abort the merge to restore clean state
+                # Try auto-resolving simple conflicts (gitignore, JSON, plaintext) before aborting
+                auto_resolved = _try_auto_resolve_simple_conflicts(project_dir)
+                if auto_resolved > 0:
+                    unresolved_check = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=project_dir)
+                    remaining = [f for f in unresolved_check.stdout.strip().split("\n") if f.strip()] if unresolved_check.returncode == 0 and unresolved_check.stdout.strip() else []
+                    if not remaining:
+                        run_git(["add", "."], cwd=project_dir)
+                        debug_success(MODULE, f"Auto-resolved {auto_resolved} conflict(s) during git merge")
+                        # Get merged files
+                        diff_r = run_git(["diff", "--cached", "--name-only"], cwd=project_dir)
+                        auto_merged_files = [f.strip() for f in diff_r.stdout.splitlines() if f.strip() and not _is_auto_claude_file(f.strip())]
+                        return {
+                            "success": True,
+                            "resolved_files": auto_merged_files,
+                            "stats": {
+                                "files_merged": len(auto_merged_files),
+                                "conflicts_resolved": auto_resolved,
+                                "ai_assisted": 0,
+                                "auto_merged": len(auto_merged_files),
+                                "git_merge": True,
+                            },
+                        }
+
+                # Auto-resolve didn't help — abort and fall back
                 abort_result = run_git(["merge", "--abort"], cwd=project_dir)
                 if abort_result.returncode != 0:
                     debug_error(
@@ -851,7 +990,7 @@ def _try_smart_merge_inner(
                         "Failed to abort merge - repo may be in inconsistent state",
                         stderr=abort_result.stderr,
                     )
-                    return None  # Trigger fallback to avoid operating on inconsistent state
+                    return None
                 print(
                     warning(
                         "  Git merge failed unexpectedly, falling back to semantic analysis..."

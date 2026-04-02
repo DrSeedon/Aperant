@@ -154,8 +154,8 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
                 {task.metadata.securitySeverity}
               </Badge>
             )}
-            {/* Source Type */}
-            {task.metadata?.sourceType && (
+            {/* Source Type — only show non-manual sources */}
+            {task.metadata?.sourceType && task.metadata.sourceType !== 'manual' && (
               <Badge variant="secondary" className="text-xs">
                 {task.metadata.sourceType === 'ideation' && task.metadata.ideationType
                   ? IDEATION_TYPE_LABELS[task.metadata.ideationType] || task.metadata.ideationType
@@ -337,6 +337,60 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
                     </TooltipContent>
                   </Tooltip>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Referenced Files (context for agent) */}
+          {task.metadata.referencedFiles && task.metadata.referencedFiles.length > 0 && (
+            <div>
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                <FileCode className="h-3 w-3 text-info" />
+                Context Files
+              </h3>
+              <div className="flex flex-wrap gap-1">
+                {task.metadata.referencedFiles.map((ref, idx) => (
+                  <Badge key={idx} variant="outline" className="text-xs font-mono">
+                    {(typeof ref === 'string' ? ref : ref.path || ref.id || '').split('/').pop()}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Agent Configuration */}
+          {(task.metadata.model || task.metadata.thinkingLevel || task.metadata.baseBranch || task.metadata.fastMode) && (
+            <div>
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                <Wrench className="h-3 w-3 text-muted-foreground" />
+                Agent Config
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {task.metadata.model && (
+                  <Badge variant="outline" className="text-xs">
+                    Model: {task.metadata.model}
+                  </Badge>
+                )}
+                {task.metadata.thinkingLevel && (
+                  <Badge variant="outline" className="text-xs">
+                    Thinking: {task.metadata.thinkingLevel}
+                  </Badge>
+                )}
+                {task.metadata.baseBranch && (
+                  <Badge variant="outline" className="text-xs font-mono">
+                    Branch: {task.metadata.baseBranch}
+                  </Badge>
+                )}
+                {task.metadata.fastMode && (
+                  <Badge variant="outline" className="text-xs text-warning">
+                    Fast Mode
+                  </Badge>
+                )}
+                {task.metadata.useWorktree === false && (
+                  <Badge variant="outline" className="text-xs text-destructive">
+                    Direct (no isolation)
+                  </Badge>
+                )}
               </div>
             </div>
           )}

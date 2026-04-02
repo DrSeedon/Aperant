@@ -72,6 +72,20 @@ const getBarColorClass = (percent: number): string => {
   return 'bg-green-500';
 };
 
+const SESSION_WINDOW_MS = 5 * 60 * 60 * 1000;
+const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+const calcRecoveryPercent = (resetTimestamp: string | undefined, windowMs: number): number | null => {
+  if (!resetTimestamp) return null;
+  const resetAt = new Date(resetTimestamp).getTime();
+  const now = Date.now();
+  const timeUntilReset = resetAt - now;
+  if (timeUntilReset <= 0) return 100;
+  const elapsed = windowMs - timeUntilReset;
+  if (elapsed <= 0) return 0;
+  return Math.round((elapsed / windowMs) * 100);
+};
+
 export function UsageIndicator() {
   const { t, i18n } = useTranslation(['common']);
   const [usage, setUsage] = useState<ClaudeUsageSnapshot | null>(null);
@@ -487,9 +501,15 @@ export function UsageIndicator() {
               <span className={sessionColorClass} title={t('common:usage.sessionShort')}>
                 {Math.round(sessionPercent)}
               </span>
+              <span className={sessionColorClass}>
+                ({calcRecoveryPercent(usage.sessionResetTimestamp, SESSION_WINDOW_MS) ?? '?'})
+              </span>
               <span className="text-muted-foreground/50">│</span>
               <span className={weeklyColorClass} title={t('common:usage.weeklyShort')}>
                 {Math.round(weeklyPercent)}
+              </span>
+              <span className={weeklyColorClass}>
+                ({calcRecoveryPercent(usage.weeklyResetTimestamp, WEEKLY_WINDOW_MS) ?? '?'})
               </span>
             </div>
           )}
@@ -543,6 +563,10 @@ export function UsageIndicator() {
                   </span>
                   <span className={`font-semibold tabular-nums text-xs ${getColorClass(usage.sessionPercent).replace('500', '600')}`}>
                     {Math.round(usage.sessionPercent)}%
+                    {(() => {
+                      const r = calcRecoveryPercent(usage.sessionResetTimestamp, SESSION_WINDOW_MS);
+                      return r != null ? <span className="text-muted-foreground font-normal ml-1">({r}%)</span> : null;
+                    })()}
                   </span>
                 </div>
                 {sessionResetTime && (
@@ -578,6 +602,10 @@ export function UsageIndicator() {
                   </span>
                   <span className={`font-semibold tabular-nums text-xs ${getColorClass(usage.weeklyPercent).replace('500', '600')}`}>
                     {Math.round(usage.weeklyPercent)}%
+                    {(() => {
+                      const r = calcRecoveryPercent(usage.weeklyResetTimestamp, WEEKLY_WINDOW_MS);
+                      return r != null ? <span className="text-muted-foreground font-normal ml-1">({r}%)</span> : null;
+                    })()}
                   </span>
                 </div>
                 {weeklyResetTime && (

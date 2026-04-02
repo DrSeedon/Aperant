@@ -163,11 +163,11 @@ export const TASK_CATEGORY_COLORS: Record<string, string> = {
 // ============================================
 
 export const TASK_COMPLEXITY_LABELS: Record<string, string> = {
-  trivial: 'Trivial',
-  small: 'Small',
-  medium: 'Medium',
-  large: 'Large',
-  complex: 'Complex'
+  trivial: 'Trivial Effort',
+  small: 'Small Effort',
+  medium: 'Medium Effort',
+  large: 'Large Effort',
+  complex: 'Complex Effort'
 };
 
 export const TASK_COMPLEXITY_COLORS: Record<string, string> = {
@@ -201,10 +201,10 @@ export const TASK_IMPACT_COLORS: Record<string, string> = {
 // ============================================
 
 export const TASK_PRIORITY_LABELS: Record<string, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  urgent: 'Urgent'
+  low: 'Low Priority',
+  medium: 'Medium Priority',
+  high: 'High Priority',
+  urgent: 'Urgent Priority'
 };
 
 export const TASK_PRIORITY_COLORS: Record<string, string> = {

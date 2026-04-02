@@ -24,6 +24,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastmcp import FastMCP
 
@@ -243,7 +244,44 @@ def get_task_status(spec: str, project_dir: str | None = None) -> str:
     return "\n".join(parts)
 
 
-# ── Task creation ────────────────────────────────────────────────
+# ── Task creation & deletion ─────────────────────────────────────
+
+
+@mcp.tool()
+def delete_task(spec: str, project_dir: str | None = None) -> str:
+    """Delete a task completely (spec directory + worktree if exists). Irreversible!
+
+    Args:
+        spec: Spec identifier
+        project_dir: Project directory path
+    """
+    import shutil
+
+    pd = _get_project_dir(project_dir)
+    spec_dir = _find_spec_dir(pd, spec)
+    if not spec_dir:
+        return f"Spec '{spec}' not found."
+
+    # Stop if running
+    pid_key = f"{pd}:{spec_dir.name}"
+    proc = _running_processes.get(pid_key)
+    if proc and proc.poll() is None:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            proc.kill()
+        del _running_processes[pid_key]
+
+    # Delete worktree if exists
+    worktree_dir = pd / ".auto-claude" / "worktrees" / "tasks" / spec_dir.name
+    if worktree_dir.exists():
+        shutil.rmtree(worktree_dir, ignore_errors=True)
+
+    # Delete spec directory
+    spec_name = spec_dir.name
+    shutil.rmtree(spec_dir, ignore_errors=True)
+
+    return f"✓ Task {spec_name} deleted (spec + worktree)."
 
 
 @mcp.tool()
@@ -251,14 +289,42 @@ def create_task(
     title: str,
     description: str,
     project_dir: str | None = None,
+    category: Literal["feature", "bug_fix", "refactoring", "documentation", "security", "performance", "ui_ux", "infrastructure", "testing"] | None = None,
+    priority: Literal["low", "medium", "high", "urgent"] | None = None,
+    complexity: Literal["trivial", "small", "medium", "large", "complex"] | None = None,
+    model: Literal["haiku", "sonnet", "opus"] | None = None,
+    thinking_level: Literal["low", "medium", "high"] | None = None,
+    impact: Literal["low", "medium", "high", "critical"] | None = None,
+    rationale: str | None = None,
+    acceptance_criteria: str | None = None,
+    affected_files: str | None = None,
+    referenced_files: str | None = None,
+    fast_mode: bool = False,
+    base_branch: str | None = None,
+    direct: bool = False,
 ) -> str:
-    """Create a new task. This creates the spec directory and starts spec generation.
+    """Create a new task with full metadata.
 
     Args:
         title: Short task title
         description: Detailed task description
         project_dir: Project directory path
+        category: Task type — feature, bug_fix, refactoring, documentation, security, performance, ui_ux, infrastructure, testing
+        priority: Priority — low, medium, high, urgent
+        complexity: Estimated complexity — trivial, small, medium, large, complex
+        model: Claude model — haiku, sonnet, opus (default: auto profile)
+        thinking_level: Thinking budget — low, medium, high
+        impact: Business impact — low, medium, high, critical
+        rationale: Why this task matters
+        acceptance_criteria: Comma-separated list of what defines done
+        affected_files: Comma-separated list of files likely to be modified
+        referenced_files: Comma-separated list of files to include as context
+        fast_mode: Use faster Opus output (higher cost)
+        base_branch: Git branch to create worktree from (default: project main branch)
+        direct: Build directly without worktree isolation
     """
+    import re as _re
+
     pd = _get_project_dir(project_dir)
     sd = _specs_dir(pd)
     sd.mkdir(parents=True, exist_ok=True)
@@ -272,31 +338,68 @@ def create_task(
         except ValueError:
             next_num = len(existing) + 1
 
-    slug = title.lower().replace(" ", "-")[:40]
+    slug = _re.sub(r"[^a-z0-9\u0400-\u04ff]+", "-", title.lower())[:40].strip("-")
     spec_name = f"{next_num:03d}-{slug}"
     spec_dir = sd / spec_name
     spec_dir.mkdir(parents=True, exist_ok=True)
 
+    workflow = category if category in ("feature", "bug_fix", "refactoring", "documentation", "security", "performance", "ui_ux", "infrastructure", "testing") else "feature"
+    now = datetime.now(timezone.utc).isoformat()
+
     plan = {
         "feature": title,
+        "description": description,
         "spec_name": spec_name,
-        "workflow_type": "standard",
+        "workflow_type": workflow,
         "phases": [],
         "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "created_at": now,
+        "updated_at": now,
+        "last_updated": now,
     }
     (spec_dir / "implementation_plan.json").write_text(
         json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
     req = {
-        "title": title,
-        "description": description,
-        "workflow_type": "standard",
+        "task_description": description,
+        "workflow_type": workflow,
     }
     (spec_dir / "requirements.json").write_text(
         json.dumps(req, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    metadata: dict = {"sourceType": "manual"}
+    if category:
+        metadata["category"] = category
+    if priority:
+        metadata["priority"] = priority
+    if complexity:
+        metadata["complexity"] = complexity
+        metadata["estimatedEffort"] = complexity
+    if model:
+        metadata["model"] = model
+    if thinking_level:
+        metadata["thinkingLevel"] = thinking_level
+    if fast_mode:
+        metadata["fastMode"] = True
+    if base_branch:
+        metadata["baseBranch"] = base_branch
+    if impact:
+        metadata["impact"] = impact
+    if rationale:
+        metadata["rationale"] = rationale
+    if acceptance_criteria:
+        metadata["acceptanceCriteria"] = [c.strip() for c in acceptance_criteria.split(",") if c.strip()]
+    if affected_files:
+        metadata["affectedFiles"] = [f.strip() for f in affected_files.split(",") if f.strip()]
+    if referenced_files:
+        metadata["referencedFiles"] = [{"id": f.strip(), "path": f.strip()} for f in referenced_files.split(",") if f.strip()]
+    if direct:
+        metadata["useWorktree"] = False
+
+    (spec_dir / "task_metadata.json").write_text(
+        json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
     (spec_dir / "spec.md").write_text(
@@ -687,7 +790,7 @@ def list_issues(
     limit: int = 20,
     labels: str | None = None,
 ) -> str:
-    """List GitHub issues for the project.
+    """List GitHub issues for the project. Convenience wrapper around `gh issue list` — use gh CLI directly for advanced filters.
 
     Args:
         project_dir: Project directory path
@@ -720,7 +823,7 @@ def list_issues(
 
 @mcp.tool()
 def get_issue(issue_number: int, project_dir: str | None = None) -> str:
-    """Get details of a specific GitHub issue.
+    """Get details of a specific GitHub issue. Convenience wrapper around `gh issue view` — use gh CLI for comments/timeline.
 
     Args:
         issue_number: Issue number
@@ -766,7 +869,7 @@ def list_prs(
     state: str = "open",
     limit: int = 20,
 ) -> str:
-    """List GitHub pull requests for the project.
+    """List GitHub pull requests for the project. Convenience wrapper around `gh pr list` — use gh CLI for advanced queries.
 
     Args:
         project_dir: Project directory path
@@ -907,7 +1010,23 @@ def accept_roadmap_feature(feature_id: str, project_dir: str | None = None) -> s
         title=feature.get("title", f"Feature {feature_id}"),
         description=f"{feature.get('description', '')}\n\n**Rationale:** {feature.get('rationale', '')}",
         project_dir=project_dir,
+        category="feature",
+        priority=feature.get("priority"),
     )
+
+    spec_name = result.split(":")[1].strip().split("\n")[0] if ":" in result else None
+    if spec_name:
+        meta_file = _specs_dir(_get_project_dir(project_dir)) / spec_name / "task_metadata.json"
+        if meta_file.exists():
+            try:
+                meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                meta["sourceType"] = "roadmap"
+                meta["featureId"] = feature_id
+                if feature.get("rationale"):
+                    meta["rationale"] = feature["rationale"]
+                meta_file.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
 
     feature["status"] = "in_progress"
     feature["outcome"] = "accepted"
@@ -1035,14 +1154,44 @@ def accept_idea(idea_id: str, project_dir: str | None = None) -> str:
     if not idea:
         return f"Idea '{idea_id}' not found."
 
+    idea_type = idea.get("type", "")
+    category_map = {
+        "code_improvements": "refactoring",
+        "security_hardening": "security",
+        "performance_optimizations": "performance",
+        "ui_ux_improvements": "ui_ux",
+        "documentation_gaps": "documentation",
+        "code_quality": "refactoring",
+    }
+
     result = create_task(
         title=idea.get("title", f"Idea {idea_id}"),
         description=f"{idea.get('description', '')}\n\n**Rationale:** {idea.get('rationale', '')}\n\n**Approach:** {idea.get('implementation_approach', '')}",
         project_dir=project_dir,
+        category=category_map.get(idea_type, "feature"),  # type: ignore[arg-type]
+        complexity=idea.get("estimated_effort"),
     )
 
+    # Write extra metadata fields that create_task doesn't handle
+    spec_name = result.split(":")[1].strip().split("\n")[0] if ":" in result else None
+    if spec_name:
+        meta_file = _specs_dir(_get_project_dir(project_dir)) / spec_name / "task_metadata.json"
+        if meta_file.exists():
+            try:
+                meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                meta["sourceType"] = "ideation"
+                meta["ideationType"] = idea_type
+                meta["ideaId"] = idea_id
+                if idea.get("rationale"):
+                    meta["rationale"] = idea["rationale"]
+                if idea.get("affected_files"):
+                    meta["affectedFiles"] = idea["affected_files"]
+                meta_file.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
+
     idea["status"] = "accepted"
-    idea["linked_task_id"] = result.split(":")[1].strip().split("\n")[0] if ":" in result else None
+    idea["linked_task_id"] = spec_name
     ideation_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     return f"✓ Idea '{idea_id}' accepted.\n{result}"
