@@ -604,15 +604,11 @@ export class ProjectStore {
     const completedCount = subtasks.filter(s => s.status === 'completed').length;
     const allCompleted = completedCount === subtasks.length;
 
-    // Only auto-correct if all subtasks are done and status is in an incomplete coding state.
-    // Preserve: in_progress (agent may be in QA phase), ai_review (QA running),
-    // human_review, done, pr_created, error.
-    // Only auto-correct: backlog, queue with all subtasks done and old enough.
-    const qaStatus = (plan as Record<string, unknown>)?.qa_signoff && typeof (plan as Record<string, unknown>).qa_signoff === 'object'
-      ? ((plan as Record<string, unknown>).qa_signoff as Record<string, unknown>)?.status
-      : undefined;
-    const aiReviewStillActive = finalStatus === 'ai_review' && qaStatus !== 'approved' && qaStatus !== 'rejected';
-    if (!allCompleted || finalStatus === 'in_progress' || finalStatus === 'human_review' || finalStatus === 'done' || finalStatus === 'pr_created' || aiReviewStillActive || finalStatus === 'error') {
+    // Only auto-correct stale statuses: backlog, queue with all subtasks done.
+    // NEVER touch: in_progress (agent running, may be in QA fix phase),
+    // ai_review, human_review, done, pr_created, error.
+    const preserveStatuses: TaskStatus[] = ['in_progress', 'ai_review', 'human_review', 'done', 'pr_created', 'error'];
+    if (!allCompleted || preserveStatuses.includes(finalStatus)) {
       return { status: finalStatus, reviewReason: finalReviewReason };
     }
 
