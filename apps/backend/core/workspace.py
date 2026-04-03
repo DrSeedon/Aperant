@@ -327,19 +327,42 @@ def merge_existing_build(
         print_status("Attempting direct merge with auto-resolve...", "info")
         spec_branch = f"auto-claude/{spec_name}"
 
-        # Rebase spec branch onto current main if behind (prevents merge failures on diverged history)
+        # Update spec branch with main changes if behind (prevents merge failures on diverged history)
         behind_check = run_git(["rev-list", "--count", f"{spec_branch}..HEAD"], cwd=project_dir)
         behind_count = int(behind_check.stdout.strip()) if behind_check.returncode == 0 and behind_check.stdout.strip().isdigit() else 0
         if behind_count > 0:
-            debug("workspace", f"Spec branch is {behind_count} commits behind, rebasing before merge")
-            # Rebase spec branch onto main
-            current = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=project_dir).stdout.strip()
-            run_git(["checkout", spec_branch], cwd=project_dir)
-            rebase_r = run_git(["rebase", current], cwd=project_dir)
-            if rebase_r.returncode != 0:
-                run_git(["rebase", "--abort"], cwd=project_dir)
-                debug("workspace", "Rebase failed, will try merge directly")
-            run_git(["checkout", current], cwd=project_dir)
+            debug("workspace", f"Spec branch is {behind_count} commits behind, updating in worktree")
+            # Can't checkout spec branch (worktree lock) — merge main INTO spec in the worktree
+            wt_path = project_dir / ".auto-claude" / "worktrees" / "tasks" / spec_name
+            if wt_path.exists():
+                current = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=project_dir).stdout.strip()
+                # Stash dirty files in worktree before update
+                wt_dirty = run_git(["status", "--porcelain"], cwd=str(wt_path))
+                wt_stashed = False
+                if wt_dirty.returncode == 0 and wt_dirty.stdout.strip():
+                    s = run_git(["stash", "push", "-m", "aperant-update-stash"], cwd=str(wt_path))
+                    wt_stashed = s.returncode == 0 and "No local changes" not in s.stdout
+                update_r = run_git(["merge", current, "--no-edit"], cwd=str(wt_path))
+                if update_r.returncode != 0:
+                    # Conflict — try auto-resolve in worktree
+                    wt_resolved = _try_auto_resolve_simple_conflicts(wt_path)
+                    if wt_resolved > 0:
+                        unres = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=str(wt_path))
+                        remaining = [f for f in unres.stdout.strip().split("\n") if f.strip()] if unres.returncode == 0 and unres.stdout.strip() else []
+                        if not remaining:
+                            run_git(["add", "."], cwd=str(wt_path))
+                            run_git(["commit", "--no-edit"], cwd=str(wt_path))
+                            debug("workspace", f"Spec branch updated with auto-resolve ({wt_resolved} conflicts)")
+                        else:
+                            run_git(["merge", "--abort"], cwd=str(wt_path))
+                            debug("workspace", "Worktree update merge failed, will try direct merge")
+                    else:
+                        run_git(["merge", "--abort"], cwd=str(wt_path))
+                        debug("workspace", "Worktree update merge failed, will try direct merge")
+                else:
+                    debug("workspace", f"Spec branch updated with {behind_count} commits from main")
+                if wt_stashed:
+                    run_git(["stash", "pop"], cwd=str(wt_path))
 
         direct_args = ["merge", spec_branch, "--no-edit"]
         if no_commit:
