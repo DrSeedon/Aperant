@@ -38,7 +38,9 @@ Auto Claude is a desktop application (+ CLI) where users describe a goal and AI 
 
 **No time estimates** — Never provide duration predictions. Use priority-based ordering instead.
 
-**PR target** — Always target the `develop` branch for PRs to AndyMik90/Auto-Claude, NOT `main`.
+**PR target** — Always target the `develop` branch for PRs, NOT `main`.
+
+**This is OUR repository** — Upstream (AndyMik90/Auto-Claude) is dead and irrelevant. Never refer to upstream, never say "this is an upstream bug", never suggest waiting for upstream fixes. We own 100% of this codebase. Fix everything ourselves.
 
 **No console.log for debugging production issues** — `console.log` output is not visible in bundled/packaged versions of the Electron app. Use Sentry for error tracking and diagnostics in production. Reserve `console.log` for development only.
 

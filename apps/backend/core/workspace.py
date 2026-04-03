@@ -332,37 +332,45 @@ def merge_existing_build(
         behind_count = int(behind_check.stdout.strip()) if behind_check.returncode == 0 and behind_check.stdout.strip().isdigit() else 0
         if behind_count > 0:
             debug("workspace", f"Spec branch is {behind_count} commits behind, updating in worktree")
-            # Can't checkout spec branch (worktree lock) — merge main INTO spec in the worktree
             wt_path = project_dir / ".auto-claude" / "worktrees" / "tasks" / spec_name
             if wt_path.exists():
                 current = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=project_dir).stdout.strip()
-                # Stash dirty files in worktree before update
+                # Stash dirty files in worktree
                 wt_dirty = run_git(["status", "--porcelain"], cwd=str(wt_path))
                 wt_stashed = False
                 if wt_dirty.returncode == 0 and wt_dirty.stdout.strip():
                     s = run_git(["stash", "push", "-m", "aperant-update-stash"], cwd=str(wt_path))
                     wt_stashed = s.returncode == 0 and "No local changes" not in s.stdout
+
+                # Merge main INTO spec branch in worktree
                 update_r = run_git(["merge", current, "--no-edit"], cwd=str(wt_path))
                 if update_r.returncode != 0:
-                    # Conflict — try auto-resolve in worktree
-                    wt_resolved = _try_auto_resolve_simple_conflicts(wt_path)
-                    if wt_resolved > 0:
-                        unres = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=str(wt_path))
-                        remaining = [f for f in unres.stdout.strip().split("\n") if f.strip()] if unres.returncode == 0 and unres.stdout.strip() else []
-                        if not remaining:
-                            run_git(["add", "."], cwd=str(wt_path))
-                            run_git(["commit", "--no-edit"], cwd=str(wt_path))
-                            debug("workspace", f"Spec branch updated with auto-resolve ({wt_resolved} conflicts)")
-                        else:
-                            run_git(["merge", "--abort"], cwd=str(wt_path))
-                            debug("workspace", "Worktree update merge failed, will try direct merge")
+                    # Conflicts — auto-resolve what we can, then --ours for code files
+                    _try_auto_resolve_simple_conflicts(wt_path)
+                    # Check remaining conflicts
+                    unres = run_git(["diff", "--name-only", "--diff-filter=U"], cwd=str(wt_path))
+                    remaining = [f.strip() for f in unres.stdout.strip().split("\n") if f.strip()] if unres.returncode == 0 and unres.stdout.strip() else []
+                    if remaining:
+                        # Code conflicts: spec version wins (--ours in worktree = spec branch)
+                        for cf in remaining:
+                            run_git(["checkout", "--ours", cf], cwd=str(wt_path))
+                            run_git(["add", cf], cwd=str(wt_path))
+                        debug("workspace", f"Resolved {len(remaining)} code conflicts with spec version: {remaining}")
+                    run_git(["add", "."], cwd=str(wt_path))
+                    commit_r = run_git(["commit", "--no-edit"], cwd=str(wt_path))
+                    if commit_r.returncode == 0:
+                        debug("workspace", f"Spec branch updated with {behind_count} commits from main")
                     else:
-                        run_git(["merge", "--abort"], cwd=str(wt_path))
-                        debug("workspace", "Worktree update merge failed, will try direct merge")
+                        debug("workspace", "Worktree update commit failed")
                 else:
-                    debug("workspace", f"Spec branch updated with {behind_count} commits from main")
+                    debug("workspace", f"Spec branch updated cleanly with {behind_count} commits from main")
+
                 if wt_stashed:
-                    run_git(["stash", "pop"], cwd=str(wt_path))
+                    # Pop stash — ignore conflicts (merge already resolved what matters)
+                    pop_r = run_git(["stash", "pop"], cwd=str(wt_path))
+                    if pop_r.returncode != 0:
+                        run_git(["checkout", "--theirs", "."], cwd=str(wt_path))
+                        run_git(["stash", "drop"], cwd=str(wt_path))
 
         direct_args = ["merge", spec_branch, "--no-edit"]
         if no_commit:
