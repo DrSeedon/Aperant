@@ -326,6 +326,21 @@ def merge_existing_build(
         # Try direct git merge first (simpler, handles auto-resolve for .gitignore/JSON conflicts)
         print_status("Attempting direct merge with auto-resolve...", "info")
         spec_branch = f"auto-claude/{spec_name}"
+
+        # Rebase spec branch onto current main if behind (prevents merge failures on diverged history)
+        behind_check = run_git(["rev-list", "--count", f"{spec_branch}..HEAD"], cwd=project_dir)
+        behind_count = int(behind_check.stdout.strip()) if behind_check.returncode == 0 and behind_check.stdout.strip().isdigit() else 0
+        if behind_count > 0:
+            debug("workspace", f"Spec branch is {behind_count} commits behind, rebasing before merge")
+            # Rebase spec branch onto main
+            current = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=project_dir).stdout.strip()
+            run_git(["checkout", spec_branch], cwd=project_dir)
+            rebase_r = run_git(["rebase", current], cwd=project_dir)
+            if rebase_r.returncode != 0:
+                run_git(["rebase", "--abort"], cwd=project_dir)
+                debug("workspace", "Rebase failed, will try merge directly")
+            run_git(["checkout", current], cwd=project_dir)
+
         direct_args = ["merge", spec_branch, "--no-edit"]
         if no_commit:
             direct_args.append("--no-commit")
