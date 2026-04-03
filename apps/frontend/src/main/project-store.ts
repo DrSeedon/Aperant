@@ -605,8 +605,13 @@ export class ProjectStore {
     const allCompleted = completedCount === subtasks.length;
 
     // Only auto-correct if all subtasks are done and status is in an incomplete coding state.
-    // Preserve ai_review (QA in progress), error (needs investigation), human_review, done, pr_created.
-    if (!allCompleted || finalStatus === 'human_review' || finalStatus === 'done' || finalStatus === 'pr_created' || finalStatus === 'ai_review' || finalStatus === 'error') {
+    // Preserve ai_review ONLY if QA is still running (not approved/rejected).
+    // Preserve error (needs investigation), human_review, done, pr_created.
+    const qaStatus = (plan as Record<string, unknown>)?.qa_signoff && typeof (plan as Record<string, unknown>).qa_signoff === 'object'
+      ? ((plan as Record<string, unknown>).qa_signoff as Record<string, unknown>)?.status
+      : undefined;
+    const aiReviewStillActive = finalStatus === 'ai_review' && qaStatus !== 'approved' && qaStatus !== 'rejected';
+    if (!allCompleted || finalStatus === 'human_review' || finalStatus === 'done' || finalStatus === 'pr_created' || aiReviewStillActive || finalStatus === 'error') {
       return { status: finalStatus, reviewReason: finalReviewReason };
     }
 
