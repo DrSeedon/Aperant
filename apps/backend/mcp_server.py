@@ -273,6 +273,122 @@ def delete_task(spec: str, project_dir: str | None = None) -> str:
 
 
 @mcp.tool()
+def update_task(
+    spec: str,
+    project_dir: str | None = None,
+    title: str | None = None,
+    description: str | None = None,
+    category: Literal["feature", "bug_fix", "refactoring", "documentation", "security", "performance", "ui_ux", "infrastructure", "testing"] | None = None,
+    priority: Literal["low", "medium", "high", "urgent"] | None = None,
+    complexity: Literal["trivial", "small", "medium", "large", "complex"] | None = None,
+    impact: Literal["low", "medium", "high", "critical"] | None = None,
+    rationale: str | None = None,
+    acceptance_criteria: str | None = None,
+    affected_files: str | None = None,
+    referenced_files: str | None = None,
+    model: Literal["haiku", "sonnet", "opus"] | None = None,
+    thinking_level: Literal["low", "medium", "high"] | None = None,
+) -> str:
+    """Update a task that hasn't started yet (pending/backlog only). Cannot update tasks in progress.
+
+    Only provided fields are updated — omitted fields stay unchanged.
+
+    Args:
+        spec: Spec identifier
+        project_dir: Project directory path
+        title: New title
+        description: New description
+        category: Task type
+        priority: Priority level
+        complexity: Estimated complexity
+        impact: Business impact
+        rationale: Why this task matters
+        acceptance_criteria: Comma-separated done criteria (replaces existing)
+        affected_files: Comma-separated file paths (replaces existing)
+        referenced_files: Comma-separated context file paths (replaces existing)
+        model: Claude model
+        thinking_level: Thinking budget
+    """
+    pd = _get_project_dir(project_dir)
+    spec_dir = _find_spec_dir(pd, spec)
+    if not spec_dir:
+        return f"Spec '{spec}' not found"
+
+    plan = _read_plan(spec_dir)
+    if not plan:
+        return "No implementation plan found."
+
+    status = plan.get("status", "pending")
+    if status not in ("pending", "backlog"):
+        subtasks = [s for p in plan.get("phases", []) for s in p.get("subtasks", [])]
+        if subtasks:
+            return f"✗ Cannot update: task is '{status}' with {len(subtasks)} subtasks. Only pending/backlog tasks without subtasks can be updated."
+
+    # Update plan
+    if title:
+        plan["feature"] = title
+    if description:
+        plan["description"] = description
+    plan["last_updated"] = datetime.now(timezone.utc).isoformat()
+    (spec_dir / "implementation_plan.json").write_text(
+        json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # Update spec.md
+    if title or description:
+        new_title = title or plan.get("feature", "")
+        spec_md = spec_dir / "spec.md"
+        if description:
+            spec_md.write_text(f"# {new_title}\n\n{description}\n", encoding="utf-8")
+        elif title and spec_md.exists():
+            content = spec_md.read_text(encoding="utf-8")
+            lines = content.split("\n", 1)
+            spec_md.write_text(f"# {new_title}\n{lines[1] if len(lines) > 1 else ''}", encoding="utf-8")
+
+    # Update metadata
+    meta_file = spec_dir / "task_metadata.json"
+    meta = {}
+    if meta_file.exists():
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    updates = {
+        "category": category, "priority": priority, "complexity": complexity,
+        "impact": impact, "rationale": rationale, "model": model, "thinkingLevel": thinking_level,
+    }
+    for key, val in updates.items():
+        if val is not None:
+            meta[key] = val
+    if complexity:
+        meta["estimatedEffort"] = complexity
+    if acceptance_criteria is not None:
+        meta["acceptanceCriteria"] = [c.strip() for c in acceptance_criteria.split(",") if c.strip()]
+    if affected_files is not None:
+        meta["affectedFiles"] = [f.strip() for f in affected_files.split(",") if f.strip()]
+    if referenced_files is not None:
+        meta["referencedFiles"] = [{"id": f.strip(), "path": f.strip()} for f in referenced_files.split(",") if f.strip()]
+
+    meta_file.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Update requirements.json
+    req_file = spec_dir / "requirements.json"
+    if req_file.exists() and description:
+        try:
+            req = json.loads(req_file.read_text(encoding="utf-8"))
+            req["task_description"] = description
+            if category:
+                req["workflow_type"] = category
+            req_file.write_text(json.dumps(req, indent=2, ensure_ascii=False), encoding="utf-8")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    changed = [k for k, v in {"title": title, "description": description, "category": category, "priority": priority, "complexity": complexity, "impact": impact, "model": model}.items() if v]
+    return f"✓ Task {spec_dir.name} updated: {', '.join(changed) if changed else 'metadata'}"
+
+
+@mcp.tool()
 def create_task(
     title: str,
     description: str,
