@@ -1,11 +1,11 @@
 ## 2.7.8-fork.2 — MCP Server, Project Map, Crash Fix, Merge Auto-Resolve (2026-04-02)
 
-### External MCP Server (30 tools)
+### External MCP Server (31 tools)
 New standalone MCP server for controlling Aperant from Claude Code. One server manages multiple projects.
 
 **start_task / stop_task delegate to Electron UI via local HTTP API** — MCP sends HTTP request to Electron (127.0.0.1, random port), which handles OAuth from Keychain, profile management, and process lifecycle. Zero tokens in MCP env. Port written to `~/.config/auto-claude-ui/api-port`.
 
-**Task management:** `list_tasks`, `get_task_details`, `get_task_status`, `create_task` (17 params with Literal enums), `delete_task`
+**Task management:** `list_tasks`, `get_task_details`, `get_task_status`, `create_task` (17 params with Literal enums), `update_task` (edit pending tasks in-place), `delete_task`
 **Execution:** `start_task` (non-blocking), `stop_task`, `recover_task`
 **Review:** `approve_task`, `reject_task` (with feedback → QA_FIX_REQUEST.md)
 **QA:** `run_qa`, `qa_status`

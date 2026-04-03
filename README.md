@@ -10,9 +10,9 @@
 
 Based on **v2.7.6 stable** → version **2.7.8-fork.2**
 
-### External MCP Server (30 tools)
+### External MCP Server (31 tools)
 Control Aperant from Claude Code in another terminal. One server manages multiple projects.
-- **Full lifecycle:** create task (17 params, Literal enums) → build → QA → approve/reject → merge → PR
+- **Full lifecycle:** create/update/delete task → build → QA → approve/reject → merge → PR
 - **GitHub integration:** import issues as tasks, list PRs
 - **Strategic tools:** roadmap (view/generate/accept features), ideation (generate/accept/dismiss ideas)
 - **Builds via Electron API:** `start_task` delegates to UI via local HTTP (OAuth handled by Electron, zero tokens in MCP)
