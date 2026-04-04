@@ -326,38 +326,10 @@ Based on the workflow type and services involved, create the implementation plan
           "status": "pending"
         }
       ]
-    },
-    {
-      "id": "phase-4-integration",
-      "name": "Integration",
-      "type": "integration",
-      "description": "Wire all services together and verify end-to-end",
-      "depends_on": ["phase-2-worker", "phase-3-frontend"],
-      "parallel_safe": false,
-      "subtasks": [
-        {
-          "id": "subtask-4-1",
-          "model": "opus",
-          "description": "End-to-end verification of analytics flow",
-          "all_services": true,
-          "files_to_modify": [],
-          "files_to_create": [],
-          "patterns_from": [],
-          "verification": {
-            "type": "e2e",
-            "steps": [
-              "Trigger event via frontend",
-              "Verify backend receives it",
-              "Verify worker processes it",
-              "Verify dashboard updates"
-            ]
-          },
-          "status": "pending"
-        }
-      ]
     }
   ]
 }
+NOTE: No separate "integration" or "E2E verification" phase needed — QA reviewer handles end-to-end testing automatically.
 ```
 
 ### Valid Phase Types
@@ -397,6 +369,7 @@ Use ONLY these values for the `type` field in phases:
 - ❌ "Create directory" as a separate subtask — directories are created with files
 - ❌ "Create `__init__.py`" as a separate subtask — it's part of creating the module
 - ❌ "Run tests" as a separate subtask — tests are verification of the previous subtask
+- ❌ "E2E verification" as a separate subtask — QA reviewer handles end-to-end testing. Use verification field in the last implementation subtask instead
 - ❌ 6 subtasks for a task that changes 2 files
 
 **Example — WRONG (over-split):**
